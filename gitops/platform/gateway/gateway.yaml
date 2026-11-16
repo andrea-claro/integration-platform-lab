@@ -1,0 +1,26 @@
+# The single entry point for HTTP traffic into the cluster (ADR-002).
+# Locally: https://<name>.ipl.localhost:8443 ; publicly only through the
+# Cloudflare tunnel connector on the Mac, for explicitly routed hostnames.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: public
+  namespace: platform
+spec:
+  gatewayClassName: envoy
+  listeners:
+    - name: https
+      protocol: HTTPS
+      port: 443
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: gateway-tls
+      allowedRoutes:
+        namespaces:
+          # Only namespaces that opt in (label set in platform/base) may attach routes.
+          from: Selector
+          selector:
+            matchLabels:
+              gateway-access: "true"

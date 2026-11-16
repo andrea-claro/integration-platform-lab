@@ -1,0 +1,46 @@
+# Envoy Gateway v1.9.3 (Gateway API v1.6.1, supports Kubernetes 1.33-1.36) - ADR-002.
+# The chart also installs the Gateway API CRDs (experimental channel) and the
+# Envoy Gateway CRDs. CRDs are large, so Server-Side Apply is required.
+# Docs: https://gateway.envoyproxy.io/v1.9/install/install-helm/
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: envoy-gateway
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: integration-platform-lab
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    # Public OCI Helm chart: no repository credentials needed (Argo CD >= 3.1).
+    repoURL: oci://registry-1.docker.io/envoyproxy/gateway-helm
+    targetRevision: v1.9.3
+    path: .
+    helm:
+      releaseName: envoy-gateway
+      valuesObject:
+        deployment:
+          envoyGateway:
+            # PLAN §7: Envoy Gateway + proxy ~256 MiB in total.
+            resources:
+              requests: {cpu: 50m, memory: 128Mi}
+              limits: {memory: 512Mi}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: platform
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m
