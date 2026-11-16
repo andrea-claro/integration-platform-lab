@@ -1,0 +1,62 @@
+# cert-manager v1.21.3: issues the gateway certificate from an internal CA.
+# Chart reference: https://github.com/cert-manager/cert-manager/blob/v1.21.3/deploy/charts/cert-manager/values.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: cert-manager
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: integration-platform-lab
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://charts.jetstack.io
+    chart: cert-manager
+    targetRevision: v1.21.3
+    helm:
+      releaseName: cert-manager
+      valuesObject:
+        crds:
+          enabled: true
+          keep: true          # deleting the app must not delete every Certificate
+        global:
+          leaderElection:
+            namespace: platform   # keep leases out of kube-system
+        # PLAN §7: cert-manager, sealed-secrets, Mosquitto ~256 MiB together.
+        resources:
+          requests: {cpu: 10m, memory: 64Mi}
+          limits: {memory: 256Mi}
+        webhook:
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {memory: 128Mi}
+        cainjector:
+          resources:
+            requests: {cpu: 10m, memory: 48Mi}
+            limits: {memory: 256Mi}
+        # The post-install API check job adds nothing under Argo CD (it retries anyway).
+        startupapicheck:
+          enabled: false
+        prometheus:
+          enabled: true
+          servicemonitor:
+            enabled: false    # turned on in Phase 3 with kube-prometheus-stack
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: platform
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m

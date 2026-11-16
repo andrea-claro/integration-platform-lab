@@ -1,0 +1,44 @@
+# Internal PKI (PLAN 1.2). Local stand-in for ACM Private CA (ADR-006).
+#
+#   selfsigned-bootstrap (ClusterIssuer)
+#     └─ internal-root-ca (Certificate, isCA, 10 years)   secret: platform/internal-root-ca
+#          └─ internal-ca (ClusterIssuer)                  signs workload/gateway certificates
+#
+# The CA secret lives in "platform", the namespace cert-manager runs in, which is
+# where ClusterIssuers look up their secrets (cluster resource namespace).
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-bootstrap
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: internal-root-ca
+  namespace: platform
+spec:
+  isCA: true
+  commonName: integration-platform-lab internal root CA
+  subject:
+    organizations:
+      - integration-platform-lab
+  secretName: internal-root-ca
+  duration: 87600h      # 10 years: a lab CA, never published
+  renewBefore: 720h
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: selfsigned-bootstrap
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: internal-ca
+spec:
+  ca:
+    secretName: internal-root-ca
