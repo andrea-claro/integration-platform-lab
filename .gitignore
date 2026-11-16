@@ -10,7 +10,9 @@
 *.unsealed.yaml
 # Private notes (original plan, job-search context) kept out of the public repo
 *.private.md
-secrets/
+# Root-level folder for local-only material (e.g. the Sealed Secrets key backup).
+# Anchored: gitops/**/secrets/ holds SealedSecrets and must stay tracked.
+/secrets/
 # Sealed Secrets controller key backups (would decrypt every SealedSecret)
 sealed-secrets-key*.yaml
 *.key
