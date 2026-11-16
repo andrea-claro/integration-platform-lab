@@ -1,0 +1,56 @@
+# Values for the argo-cd chart 10.18.0 (Argo CD v3.6.1).
+# Reference: https://github.com/argoproj/argo-helm/blob/argo-cd-10.18.0/charts/argo-cd/values.yaml
+# Resource budget (PLAN.md §7): ~512 MiB of memory requests in total.
+
+global:
+  # Local hostname for now; becomes argocd.<domain> only if it is ever published
+  # (and then only behind Cloudflare Access).
+  domain: argocd.localhost
+  logging:
+    format: json
+    level: info
+
+configs:
+  params:
+    # TLS is terminated in front of the server (kubectl port-forward locally,
+    # Envoy Gateway later), so the server itself speaks plain HTTP in-cluster.
+    server.insecure: true
+  cm:
+    admin.enabled: true
+    exec.enabled: false
+    statusbadge.enabled: false
+    # Faster feedback after a push than the 120s default; keeps load low.
+    timeout.reconciliation: 60s
+    timeout.reconciliation.jitter: 15s
+
+# Not needed: single local admin user, no SSO, no notifications.
+dex:
+  enabled: false
+notifications:
+  enabled: false
+
+controller:
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {memory: 768Mi}
+
+repoServer:
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {memory: 512Mi}
+
+server:
+  resources:
+    requests: {cpu: 25m, memory: 64Mi}
+    limits: {memory: 256Mi}
+
+applicationSet:
+  replicas: 1
+  resources:
+    requests: {cpu: 10m, memory: 32Mi}
+    limits: {memory: 128Mi}
+
+redis:
+  resources:
+    requests: {cpu: 10m, memory: 32Mi}
+    limits: {memory: 128Mi}

@@ -1,0 +1,69 @@
+# ---------------------------------------------------------------------------
+# Secrets and local-only values. NEVER commit these.
+# Real values live only in .env on the workstation; .env.example lists every
+# variable with a placeholder. In Git, secrets exist only as SealedSecrets.
+# ---------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.secret.yaml
+*.unsealed.yaml
+# Private notes (original plan, job-search context) kept out of the public repo
+*.private.md
+secrets/
+# Sealed Secrets controller key backups (would decrypt every SealedSecret)
+sealed-secrets-key*.yaml
+*.key
+*.pem
+*.p12
+*.pfx
+# cloudflared local credentials (we use a token from .env instead)
+.cloudflared/
+cloudflared-credentials*.json
+# kubeconfigs
+kubeconfig
+*.kubeconfig
+.kube/
+
+# ---------------------------------------------------------------------------
+# Terraform / OpenTofu
+# ---------------------------------------------------------------------------
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+crash.*.log
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# ---------------------------------------------------------------------------
+# Python
+# ---------------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.egg-info/
+
+# ---------------------------------------------------------------------------
+# Helm / build output / editors / OS
+# ---------------------------------------------------------------------------
+charts/*.tgz
+.rendered/
+dist/
+build/
+.idea/
+.vscode/
+*.swp
+.DS_Store

@@ -1,0 +1,6 @@
+# App-of-apps (ADR-003): one Argo CD Application per component.
+# The root Application itself is created by infra/bootstrap.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - platform-base.yaml

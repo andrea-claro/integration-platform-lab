@@ -1,0 +1,126 @@
+# Local dev stack for the three services (make dev-up / dev-smoke / dev-down).
+# Not a deployment path: the cluster gets everything from gitops/ via Argo CD.
+# Only the API is published, and only on 127.0.0.1.
+name: ipl-dev
+
+x-service-defaults: &service-defaults
+  restart: unless-stopped
+  read_only: true            # same constraint as readOnlyRootFilesystem in Kubernetes
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  environment: &common-env
+    LOG_LEVEL: INFO
+    HTTP_PORT: "8080"
+
+x-healthcheck: &python-healthcheck
+  test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/readyz', timeout=2)"]
+  interval: 5s
+  timeout: 3s
+  retries: 20
+  start_period: 5s
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2.1.2-alpine
+    volumes:
+      - ./mosquitto/mosquitto.dev.conf:/mosquitto/config/mosquitto.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -h 127.0.0.1 -t '$$SYS/broker/uptime' -C 1 -W 3 >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  kafka:
+    image: apache/kafka:4.3.2
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_SHARE_COORDINATOR_STATE_TOPIC_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"   # topics are declared, like KafkaTopic in the cluster
+      KAFKA_HEAP_OPTS: -Xms384m -Xmx384m
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 10s
+
+  kafka-init:
+    image: apache/kafka:4.3.2
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists
+        --topic telemetry.raw --partitions 3 --replication-factor 1
+        --config retention.ms=3600000 &&
+        /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --create --if-not-exists
+        --topic telemetry.dlq --partitions 1 --replication-factor 1
+        --config retention.ms=86400000
+    restart: "no"
+
+  device-simulator:
+    <<: *service-defaults
+    build:
+      context: ./device-simulator
+      target: runtime
+    image: ipl-dev/device-simulator:local
+    environment:
+      <<: *common-env
+      MQTT_HOST: mosquitto
+      DEVICE_COUNT: "5"
+      PUBLISH_INTERVAL_SECONDS: "2"
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+    healthcheck: *python-healthcheck
+
+  mqtt-kafka-bridge:
+    <<: *service-defaults
+    build:
+      context: ./mqtt-kafka-bridge
+      target: runtime
+    image: ipl-dev/mqtt-kafka-bridge:local
+    environment:
+      <<: *common-env
+      MQTT_HOST: mosquitto
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: telemetry.raw
+      KAFKA_DLQ_TOPIC: telemetry.dlq
+    depends_on:
+      mosquitto:
+        condition: service_healthy
+      kafka-init:
+        condition: service_completed_successfully
+    healthcheck: *python-healthcheck
+
+  telemetry-api:
+    <<: *service-defaults
+    build:
+      context: ./telemetry-api
+      target: runtime
+    image: ipl-dev/telemetry-api:local
+    environment:
+      <<: *common-env
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      KAFKA_TOPIC: telemetry.raw
+    ports:
+      - "127.0.0.1:8088:8080"
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    healthcheck: *python-healthcheck
