@@ -1,0 +1,11 @@
+# PLAN §7: Mosquitto, device-simulator, mqtt-kafka-bridge ~250 MiB together.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: compute
+spec:
+  hard:
+    requests.cpu: 500m
+    requests.memory: 512Mi
+    limits.memory: 1536Mi
+    pods: "10"

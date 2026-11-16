@@ -1,0 +1,11 @@
+# PLAN §7: Prometheus ~1 GiB, Grafana + Alertmanager ~384 MiB, operator and exporters.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: compute
+spec:
+  hard:
+    requests.cpu: "1"
+    requests.memory: 2Gi
+    limits.memory: 4Gi
+    pods: "20"

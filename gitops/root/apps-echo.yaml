@@ -12,7 +12,7 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
-  project: default
+  project: apps
   source:
     repoURL: https://github.com/andrea-claro/integration-platform-lab.git
     targetRevision: main

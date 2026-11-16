@@ -1,0 +1,8 @@
+# Allow rules for Prometheus (scrape egress, API), Alertmanager (Telegram) and
+# Grafana (from the gateway) arrive with kube-prometheus-stack in Phase 3.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: observability
+resources:
+  - ../../base
+  - resourcequota.yaml

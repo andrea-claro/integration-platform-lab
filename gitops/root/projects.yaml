@@ -1,0 +1,154 @@
+# Argo CD AppProjects, one per domain (PLAN 1.4).
+#
+# - platform: owned by the platform team. The only project allowed to create
+#   cluster-scoped resources (explicit allow list) and the guardrails
+#   (NetworkPolicies, ResourceQuotas, LimitRanges) in every domain namespace.
+# - streaming, iot, apps, observability: workloads only, each confined to its own
+#   namespace, from this repository only; they cannot create cluster-scoped
+#   resources or change the guardrails of their namespace.
+#
+# Chart repositories and cluster resources needed by Strimzi (streaming) and
+# kube-prometheus-stack (observability) are added in Phases 2 and 3.
+# The root Application stays in the "default" project (created by infra/bootstrap).
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-20"
+spec:
+  description: Platform components - gateway, PKI, secrets, guardrails
+  sourceRepos:
+    - https://github.com/andrea-claro/integration-platform-lab.git
+    - https://charts.jetstack.io
+    - https://bitnami.github.io/sealed-secrets
+    - oci://registry-1.docker.io/envoyproxy/*
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: platform
+    # Guardrails are deployed into every domain namespace.
+    - server: https://kubernetes.default.svc
+      namespace: streaming
+    - server: https://kubernetes.default.svc
+      namespace: iot
+    - server: https://kubernetes.default.svc
+      namespace: apps
+    - server: https://kubernetes.default.svc
+      namespace: observability
+  # Cluster-scoped kinds actually rendered by our manifests and the pinned charts
+  # (cert-manager, Envoy Gateway, Sealed Secrets). Anything else is refused.
+  clusterResourceWhitelist:
+    - group: ""
+      kind: Namespace
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+    - group: admissionregistration.k8s.io
+      kind: ValidatingAdmissionPolicy
+    - group: admissionregistration.k8s.io
+      kind: ValidatingAdmissionPolicyBinding
+    - group: cert-manager.io
+      kind: ClusterIssuer
+    - group: gateway.networking.k8s.io
+      kind: GatewayClass
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: streaming
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-20"
+spec:
+  description: Kafka (Strimzi) and topics
+  sourceRepos:
+    - https://github.com/andrea-claro/integration-platform-lab.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: streaming
+  clusterResourceWhitelist: []
+  # Guardrails are owned by the platform project.
+  namespaceResourceBlacklist:
+    - group: networking.k8s.io
+      kind: NetworkPolicy
+    - group: ""
+      kind: ResourceQuota
+    - group: ""
+      kind: LimitRange
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: iot
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-20"
+spec:
+  description: MQTT broker, device simulator, MQTT-to-Kafka bridge
+  sourceRepos:
+    - https://github.com/andrea-claro/integration-platform-lab.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: iot
+  clusterResourceWhitelist: []
+  namespaceResourceBlacklist:
+    - group: networking.k8s.io
+      kind: NetworkPolicy
+    - group: ""
+      kind: ResourceQuota
+    - group: ""
+      kind: LimitRange
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: apps
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-20"
+spec:
+  description: Telemetry API and its routes
+  sourceRepos:
+    - https://github.com/andrea-claro/integration-platform-lab.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: apps
+  clusterResourceWhitelist: []
+  namespaceResourceBlacklist:
+    - group: networking.k8s.io
+      kind: NetworkPolicy
+    - group: ""
+      kind: ResourceQuota
+    - group: ""
+      kind: LimitRange
+---
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: observability
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-20"
+spec:
+  description: Prometheus, Alertmanager, Grafana, dashboards and alert rules
+  sourceRepos:
+    - https://github.com/andrea-claro/integration-platform-lab.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: observability
+  clusterResourceWhitelist: []
+  namespaceResourceBlacklist:
+    - group: networking.k8s.io
+      kind: NetworkPolicy
+    - group: ""
+      kind: ResourceQuota
+    - group: ""
+      kind: LimitRange
