@@ -17,7 +17,7 @@ step "yamllint"
 yamllint --strict -c .yamllint.yaml .
 
 step "shellcheck"
-shellcheck scripts/*.sh
+shellcheck scripts/*.sh tests/smoke/*.sh
 
 step "ruff (services)"
 ruff check services

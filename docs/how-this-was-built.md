@@ -60,6 +60,12 @@ and a human review section.
   `privileged` for node-exporter — revisit in Phase 3.
 - Unit tests live next to each service (`services/<name>/tests`) rather than in `tests/`.
 
+**Phase 0 acceptance (verified on the Mac, 2026-11-16):** `make cluster && make bootstrap` →
+Argo CD v3.6.1 healthy; `root` and `platform-base` Synced/Healthy; five domain namespaces created by
+Argo CD. Issues hit on the way: an old OpenTofu 1.8.5 on PATH (fixed with the pinned 1.13.9 from
+`scripts/install-tools-macos.sh`), the repository URL (now `integration-platform-lab`), and a local
+DNS outage unrelated to the project.
+
 **Decisions (Andrea, same day)**
 
 - Exposure: reuse the Cloudflare Tunnel connector already running on the Mac (no cloudflared in
@@ -70,6 +76,42 @@ and a human review section.
 - Security posture: the hard requirement is that nothing is reachable from outside except the
   explicit public hostnames; inside the local cluster, pragmatic settings are acceptable. Current
   Pod Security levels are kept.
+
+**Human review:** _to be filled in by Andrea_
+
+---
+
+## 2026-11-16 — Phase 1, steps 1–2: gateway, internal CA, Sealed Secrets
+
+**Tasks:** 1.1 Gateway API + Envoy Gateway · 1.2 cert-manager internal CA · 1.3 Sealed Secrets and
+`make seal` helpers. Plan approved by Andrea before implementation (CLAUDE.md: exposure and secrets).
+
+**Produced**
+
+- Argo CD Applications (app-of-apps): `cert-manager` (v1.21.3), `envoy-gateway` (v1.9.3, public
+  OCI chart, Gateway API v1.6.1), `sealed-secrets` (chart 2.22.0, controller 0.41.2),
+  `platform-pki`, `platform-gateway`, and a temporary `apps-echo`.
+- PKI: self-signed root CA (10 years, ECDSA P-256) → `ClusterIssuer internal-ca` → 90-day gateway
+  certificate (`*.ipl.localhost`, renewed 30 days before expiry).
+- `GatewayClass envoy` + `EnvoyProxy` (small resources, LoadBalancer on the k3d loopback mapping)
+  + `Gateway public` (HTTPS 443; only namespaces labelled `gateway-access=true` may attach routes).
+- Echo service (`traefik/whoami`, non-root, read-only root filesystem) and its `HTTPRoute`.
+- `scripts/seal-key.sh` + `make seal-backup`; `make bootstrap` restores the key first, so a
+  recreated cluster can still decrypt the committed SealedSecrets.
+- `tests/smoke/phase1-gateway.sh` + `make smoke`; ADR-005 with the documented exception to the
+  "no Bitnami" rule (the Sealed Secrets project's own chart and image).
+
+**Verified (agent sandbox)**
+
+- Versions checked against each project's docs for the pinned release (Envoy Gateway
+  compatibility matrix: v1.9 supports Kubernetes 1.35; Argo CD 3.6 native OCI Helm sources).
+- `helm template` of the three charts with the chosen values.
+- Server-side dry-run of every manifest against the real CRDs of the pinned charts, in a k3s
+  v1.35.10 API server: all accepted. No Pod Security warnings, even at `restricted`.
+- `make lint` green; shellcheck now also covers `tests/smoke/`. A bash 3.2 incompatibility
+  (empty array under `set -u`) caught and fixed in the smoke test.
+
+**Not yet verified:** running on the Mac (`make smoke`), then `make seal` / `make seal-backup`.
 
 **Human review:** _to be filled in by Andrea_
 

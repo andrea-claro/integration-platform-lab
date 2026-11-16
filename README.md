@@ -38,6 +38,7 @@ make dev-down
 make cluster      # k3d cluster "ipl", Traefik disabled, HTTPS on 127.0.0.1:8443
 make bootstrap    # OpenTofu installs Argo CD + the root Application (app-of-apps)
 make status
+make smoke        # acceptance checks (e.g. HTTPS through the gateway)
 make argocd-password && make argocd-ui    # http://localhost:8080
 ```
 

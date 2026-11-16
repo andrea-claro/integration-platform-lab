@@ -1,0 +1,22 @@
+# Serving certificate of the shared Gateway, issued by the internal CA.
+# Short lifetime on purpose: expiry is monitored (Phase 3) and is the "cert"
+# incident scenario (Phase 4). The public hostnames are added in Phase 4.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: gateway-tls
+  namespace: platform
+spec:
+  secretName: gateway-tls
+  duration: 2160h       # 90 days
+  renewBefore: 720h     # renew 30 days before expiry
+  privateKey:
+    algorithm: ECDSA
+    size: 256
+    rotationPolicy: Always
+  dnsNames:
+    - "*.ipl.localhost"
+  issuerRef:
+    group: cert-manager.io
+    kind: ClusterIssuer
+    name: internal-ca

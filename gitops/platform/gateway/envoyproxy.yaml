@@ -1,0 +1,21 @@
+# Data-plane settings for the Envoy proxies of GatewayClass "envoy".
+# API: https://gateway.envoyproxy.io/v1.9/api/extension_types/#envoyproxy
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: public-proxy
+  namespace: platform
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyDeployment:
+        replicas: 1
+        container:
+          resources:
+            requests: {cpu: 50m, memory: 64Mi}
+            limits: {memory: 256Mi}
+      envoyService:
+        # Served by the k3s service load balancer; k3d maps 127.0.0.1:8443 -> :443.
+        # Nothing is published beyond the Mac's loopback interface.
+        type: LoadBalancer

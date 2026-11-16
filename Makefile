@@ -49,6 +49,7 @@ down: ## Delete the k3d cluster
 bootstrap: ## Install Argo CD and the root Application (Terraform/OpenTofu)
 	@$(LOAD_ENV); \
 	set -e; \
+	KUBE_CONTEXT=$(KUBE_CONTEXT) scripts/seal-key.sh restore; \
 	$(TF) -chdir=infra/bootstrap init -input=false; \
 	$(TF) -chdir=infra/bootstrap apply -input=false -auto-approve \
 	  -var "kube_context=$(KUBE_CONTEXT)" \
@@ -66,9 +67,12 @@ argocd-ui: ## Argo CD UI on http://localhost:8080 (port-forward, local only)
 	kubectl --context $(KUBE_CONTEXT) -n argocd port-forward svc/argocd-server 8080:80
 
 # --- Secrets -----------------------------------------------------------------
-.PHONY: seal check-secrets
+.PHONY: seal seal-backup check-secrets
 seal: ## Seal secrets from .env into SealedSecret manifests (needs the controller)
 	@scripts/seal-secrets.sh $(SECRETS)
+
+seal-backup: ## Back up the Sealed Secrets key to secrets/ (gitignored; restored by bootstrap)
+	@KUBE_CONTEXT=$(KUBE_CONTEXT) scripts/seal-key.sh backup
 
 check-secrets: ## Fail on plain Secret manifests or tracked .env files
 	@scripts/check-no-plain-secrets.sh
@@ -85,12 +89,15 @@ import: build ## Build and import the images into k3d (fast local iteration)
 	k3d image import -c $(CLUSTER_NAME) $(foreach s,$(SERVICES),$(IMAGE_PREFIX)$(s):$(IMAGE_TAG))
 
 # --- Quality -----------------------------------------------------------------
-.PHONY: test lint toolbox
+.PHONY: test lint toolbox smoke
 test: ## Unit tests + ruff for every service, inside Docker (test stage)
 	@set -e; for s in $(SERVICES); do \
 	  echo "==> $$s"; \
 	  docker build --target test --progress=plain -t ipl-test-$$s services/$$s; \
 	done
+
+smoke: ## Acceptance checks against the running cluster (tests/smoke)
+	@set -e; for t in tests/smoke/*.sh; do KUBE_CONTEXT=$(KUBE_CONTEXT) $$t; done
 
 toolbox: ## Build the pinned linter image
 	docker build -q -t $(TOOLBOX) tools >/dev/null

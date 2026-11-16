@@ -1,0 +1,33 @@
+# Shared Gateway (HTTPS 443) with its certificate from the internal CA.
+# Needs the Gateway API, Envoy Gateway and cert-manager CRDs: retries until they exist.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-gateway
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: integration-platform-lab
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/andrea-claro/integration-platform-lab.git
+    targetRevision: main
+    path: gitops/platform/gateway
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - SkipDryRunOnMissingResource=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m

@@ -1,0 +1,33 @@
+# Internal PKI: self-signed root CA -> ClusterIssuer "internal-ca".
+# Needs the cert-manager CRDs: retries until the cert-manager app has synced.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-pki
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: integration-platform-lab
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/andrea-claro/integration-platform-lab.git
+    targetRevision: main
+    path: gitops/platform/pki
+  destination:
+    server: https://kubernetes.default.svc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - SkipDryRunOnMissingResource=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m
