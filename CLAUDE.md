@@ -26,7 +26,8 @@ The full plan, phases and acceptance criteria are in **PLAN.md**. Work only on t
 - **Public surface** only through the Cloudflare Tunnel connector on the Mac, and only for hostnames with an explicit
   HTTPRoute (`status.`, `api.`). Never publish Argo CD or other admin UIs. No NodePort or hostPort exposure besides
   the local k3d port mapping, which binds to 127.0.0.1 only.
-- **No ingress-nginx** (retired) → Gateway API with Envoy Gateway. **No Bitnami charts or images** → official charts/images only.
+- **No ingress-nginx** (retired) → Gateway API with Envoy Gateway. **No Bitnami charts or images** → official charts/images only
+  (one documented exception: the Sealed Secrets project's own chart and image, ADR-005).
 - **Pin versions** of every chart and image; check the docs of the pinned version before writing CRDs or policies.
 - **English only** in code, comments, docs and commit messages. **No employer names or branding.**
 - **Ask before** adding a component, changing the architecture in PLAN.md §3 or raising resource requests above PLAN.md §7.
@@ -65,6 +66,7 @@ Created in Phase 0; keep this list up to date.
 - `make status` — Argo CD apps, pods not ready, firing alerts
 - `make argocd-password` / `make argocd-ui` — admin password, UI on http://localhost:8080
 - `make seal` — seal secrets from `.env` into SealedSecret manifests; `make check-secrets` — plain-secret scan
+- `make seal-backup` — back up the Sealed Secrets key to `secrets/` (gitignored); `make bootstrap` restores it
 - `make test` — ruff + pytest per service in the image `test` stage; `make lint` — repo checks in the toolbox image
 - `make build` / `make import` — build service images, import them into k3d
 - `make dev-up` / `make dev-smoke` / `make dev-down` — services with Docker Compose (local dev only, not a deployment path)
