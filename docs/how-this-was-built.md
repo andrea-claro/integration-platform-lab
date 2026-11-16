@@ -123,3 +123,44 @@ seal script now creates it with mode 600 (the in-cluster broker will mount it re
 **Human review:** _to be filled in by Andrea_
 
 ---
+
+## 2026-11-16 — Phase 1, step 3: AppProjects, RBAC, NetworkPolicies, quotas
+
+**Tasks:** 1.4 AppProject per domain and RBAC checks · 1.5 default-deny NetworkPolicies with explicit
+allows · 1.6 ResourceQuota and LimitRange per namespace. Plan approved by Andrea before
+implementation (CLAUDE.md: RBAC and NetworkPolicies). From this step on the agent delivers through
+pull requests; Andrea reviews and merges.
+
+**Produced**
+
+- Five AppProjects. `platform` is the only one with cluster-scoped kinds, from an explicit allow
+  list built from what the pinned charts actually render; the domain projects are confined to their
+  namespace and cannot change NetworkPolicies, ResourceQuotas or LimitRanges.
+- `platform-guardrails` Application: default deny in every domain namespace plus DNS and Prometheus
+  scraping; `platform` adds Kubernetes API egress for the controllers, public ingress to the Envoy
+  proxies (10443), proxies → opted-in namespaces and → xDS; `apps` accepts only the proxies.
+  Every rule carries a comment explaining why; the flow table is in `gitops/platform/guardrails/README.md`.
+- ResourceQuotas sized on PLAN §7 (CPU requested, never limited) and a LimitRange with defaults.
+- `tests/smoke/phase1-security.sh`: guardrails present, iot → apps blocked, `kubectl auth can-i`
+  checks for the workload service account, no service account bound to cluster-admin, no
+  Application left in the default project.
+
+**Design notes**
+
+- Checked in the kube-router source that traffic from the node itself is always accepted
+  (`--src-type LOCAL`), so kubelet probes and API server → webhook calls need no rule. Egress from
+  pods to the API server does need one: `kubernetes.default` is DNATed to the node IP on 6443.
+- The cert-manager webhook has `failurePolicy: Fail`, so it must stay reachable from the API server
+  (it is, as node-local traffic); the Envoy Gateway topology webhook is `Ignore`.
+- Envoy listens on 10443 for the 443 listener (Envoy Gateway shifts ports below 1024 by 10000).
+
+**Verified (agent sandbox):** lint green; every manifest accepted by a k3s v1.35.10 API server with
+the real CRDs; guardrails applied for real, then every chart pod (plus the Envoy proxy and the
+network probe pod) created in server-side dry-run: all admitted by LimitRange, ResourceQuota and
+Pod Security, totals within the quotas even with the charts' default resources.
+
+**Not yet verified:** enforcement on the live cluster (`make smoke` on the Mac).
+
+**Human review:** _to be filled in by Andrea_
+
+---
