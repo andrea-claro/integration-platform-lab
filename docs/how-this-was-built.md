@@ -159,7 +159,18 @@ the real CRDs; guardrails applied for real, then every chart pod (plus the Envoy
 network probe pod) created in server-side dry-run: all admitted by LimitRange, ResourceQuota and
 Pod Security, totals within the quotas even with the charts' default resources.
 
-**Not yet verified:** enforcement on the live cluster (`make smoke` on the Mac).
+**Verified on the Mac (2026-11-16):** all 8 Applications Synced/Healthy in their projects; `make smoke`:
+gateway checks 5/5 PASS *through* the new policies; guardrails present in all five namespaces;
+`kubectl auth can-i` checks and the cluster-admin check PASS; iot → apps blocked.
+
+**Corrected after the first run:** the probe expected a timeout (curl exit 28) but got exit 7
+(connection refused in 4 ms) and reported "inconclusive". The kube-router source confirms it
+`REJECT`s denied traffic rather than dropping it, so 7 is the correct "blocked" signal. The test now
+accepts 7 or 28, after checking that `echo` has ready endpoints (a Service without backends is
+refused the same way and must not pass for a policy block).
+
+**Phase 1 acceptance met:** echo over HTTPS through the gateway with the internal CA; a pod in `iot`
+cannot reach `apps`; `kubectl auth can-i` checks scripted in `tests/smoke`.
 
 **Human review:** _to be filled in by Andrea_
 

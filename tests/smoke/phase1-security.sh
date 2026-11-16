@@ -36,6 +36,12 @@ for ns in platform streaming iot apps observability; do
 done
 
 # --- Network isolation: iot -> apps must be blocked ----------------------------
+# kube-router REJECTs denied traffic, so a blocked connection fails at once with
+# "connection refused" (curl exit 7); a plain DROP would time out (exit 28).
+# A Service without ready endpoints is refused the same way, so check first
+# that echo is actually serving (it also answers through the gateway).
+ready_endpoints="$(k -n apps get endpointslices -l kubernetes.io/service-name=echo \
+  -o jsonpath='{range .items[*].endpoints[*]}{.conditions.ready}{"\n"}{end}' 2>/dev/null | grep -c true || true)"
 probe_overrides='{
   "spec": {
     "securityContext": {"runAsNonRoot": true, "runAsUser": 100, "seccompProfile": {"type": "RuntimeDefault"}},
@@ -55,7 +61,13 @@ out="$(k -n iot logs netpol-probe 2>&1 || true)"
 k -n iot delete pod netpol-probe --ignore-not-found --wait=false >/dev/null 2>&1 || true
 code="$(sed -n 's/.*curl_exit=\([0-9]*\).*/\1/p' <<<"$out" | tail -n1)"
 case "$code" in
-  28) pass "pod in iot cannot reach echo.apps (connection timed out: blocked by NetworkPolicy)" ;;
+  7 | 28)
+    if ((ready_endpoints > 0)); then
+      pass "pod in iot cannot reach echo.apps ($ready_endpoints ready endpoint(s); connection rejected by NetworkPolicy, curl exit $code)"
+    else
+      fail "echo.apps has no ready endpoints: the probe cannot tell a policy block from a missing backend"
+    fi
+    ;;
   0) fail "pod in iot reached echo.apps: the default-deny policy is not enforced" ;;
   6) fail "probe could not resolve echo.apps.svc (DNS egress blocked?) - inconclusive" ;;
   *) fail "network probe inconclusive (curl exit '${code:-none}'): $(tail -n 3 <<<"$out" | tr '\n' ' ')" ;;
