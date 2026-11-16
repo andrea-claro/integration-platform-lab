@@ -1,0 +1,8 @@
+# Allow rules for Mosquitto, the simulator and the bridge arrive with the
+# workloads in Phase 2. Until then: default deny + DNS + Prometheus.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: iot
+resources:
+  - ../../base
+  - resourcequota.yaml

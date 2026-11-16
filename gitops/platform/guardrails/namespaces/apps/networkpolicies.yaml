@@ -1,0 +1,21 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-from-gateway
+spec:
+  # Why: the Envoy proxies of the shared Gateway forward routed requests to the
+  # API (and, until Phase 2, the echo service). Which Services are reachable is
+  # decided by the HTTPRoutes; nothing else may connect to pods in "apps".
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: platform
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: envoy
+              app.kubernetes.io/component: proxy
+              app.kubernetes.io/managed-by: envoy-gateway

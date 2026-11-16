@@ -1,0 +1,33 @@
+# Guardrails for every domain namespace (PLAN 1.5-1.6): default-deny
+# NetworkPolicies with explicit allows, ResourceQuotas and LimitRanges.
+# Owned by the platform project; domain projects cannot change them.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: platform-guardrails
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: integration-platform-lab
+  annotations:
+    argocd.argoproj.io/sync-wave: "-8"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/andrea-claro/integration-platform-lab.git
+    targetRevision: main
+    path: gitops/platform/guardrails
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: platform
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m

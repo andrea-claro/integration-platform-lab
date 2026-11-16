@@ -1,0 +1,57 @@
+# Common NetworkPolicies, applied to every domain namespace by the overlays.
+#
+# Enforced by the kube-router policy controller embedded in k3s. Traffic that
+# originates on the node itself (kubelet probes, API server calls to admission
+# webhooks) is always accepted by kube-router, so it needs no rule here.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+spec:
+  # Every pod, both directions: anything not explicitly allowed below is dropped.
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+spec:
+  # Why: every pod resolves Service names through CoreDNS.
+  podSelector: {}
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-scrape
+spec:
+  # Why: Prometheus (Phase 3) scrapes /metrics of every workload. Only the
+  # Prometheus pods in "observability" are allowed, on any port, ingress only.
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus

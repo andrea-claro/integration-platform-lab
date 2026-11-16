@@ -1,0 +1,96 @@
+# Allow rules specific to the "platform" namespace (cert-manager, Envoy Gateway,
+# Sealed Secrets). Webhook calls from the API server and kubelet probes come
+# from the node itself and are accepted by kube-router without a rule.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kube-api-egress
+spec:
+  # Why: the controllers (cert-manager, cainjector, webhook, Envoy Gateway,
+  # Sealed Secrets, chart hook jobs) watch and update the Kubernetes API.
+  # The Envoy data-plane proxies do not need it and are excluded.
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/managed-by
+        operator: NotIn
+        values: ["envoy-gateway"]
+  policyTypes:
+    - Egress
+  egress:
+    # k3s: kubernetes.default (10.43.0.1:443) is DNATed to the node IP on 6443,
+    # and kube-router evaluates the translated address. The node IP is on the
+    # k3d Docker network (172.16.0.0/12, or 192.168.0.0/16 on some hosts).
+    - to:
+        - ipBlock:
+            cidr: 172.16.0.0/12
+        - ipBlock:
+            cidr: 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 6443
+    # Same destination before translation, in case it is evaluated there.
+    - to:
+        - ipBlock:
+            cidr: 10.43.0.1/32
+      ports:
+        - protocol: TCP
+          port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: envoy-proxy
+spec:
+  # The data-plane pods of Gateway "public" (labels set by Envoy Gateway v1.9).
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: envoy
+      app.kubernetes.io/component: proxy
+      app.kubernetes.io/managed-by: envoy-gateway
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Why: the HTTPS listener (Service port 443 -> container port 10443). It is
+    # the cluster's entry point; outside the cluster it is reachable only through
+    # the k3d loopback mapping (127.0.0.1:8443) and the Cloudflare tunnel.
+    - ports:
+        - protocol: TCP
+          port: 10443
+  egress:
+    # Why: forward requests to the backends of HTTPRoutes. Only namespaces that
+    # opted in to the Gateway (label gateway-access=true) can be reached.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              gateway-access: "true"
+    # Why: receive configuration (xDS) from the Envoy Gateway controller.
+    - to:
+        - podSelector:
+            matchLabels:
+              control-plane: envoy-gateway
+      ports:
+        - protocol: TCP
+          port: 18000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: envoy-gateway-xds
+spec:
+  # Why: the Envoy proxies connect to the controller's xDS server.
+  podSelector:
+    matchLabels:
+      control-plane: envoy-gateway
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: envoy
+              app.kubernetes.io/component: proxy
+              app.kubernetes.io/managed-by: envoy-gateway
+      ports:
+        - protocol: TCP
+          port: 18000

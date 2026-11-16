@@ -1,0 +1,11 @@
+# PLAN §7: telemetry-api ~128 MiB (plus the temporary echo service).
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: compute
+spec:
+  hard:
+    requests.cpu: 500m
+    requests.memory: 512Mi
+    limits.memory: 1536Mi
+    pods: "10"

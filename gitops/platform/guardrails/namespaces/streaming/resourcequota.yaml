@@ -1,0 +1,11 @@
+# PLAN §7: Kafka broker (KRaft) ~1 GiB, plus the Strimzi operators and Kafka Exporter.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: compute
+spec:
+  hard:
+    requests.cpu: "1"
+    requests.memory: 2Gi
+    limits.memory: 4Gi
+    pods: "15"

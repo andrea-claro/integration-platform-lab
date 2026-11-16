@@ -1,0 +1,14 @@
+# PLAN §7: Envoy Gateway + proxy ~256 MiB, cert-manager + Sealed Secrets ~200 MiB.
+# Ceilings with headroom for rolling updates (surge pods) and chart hook jobs;
+# CPU is not limited on purpose
+# (limits cause throttling on a laptop), only requested.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: compute
+spec:
+  hard:
+    requests.cpu: "1"
+    requests.memory: 768Mi
+    limits.memory: 4Gi
+    pods: "20"

@@ -11,6 +11,7 @@ resources:
   - cert-manager.yaml
   - envoy-gateway.yaml
   - sealed-secrets.yaml
+  - platform-guardrails.yaml
   - platform-pki.yaml
   - platform-gateway.yaml
   - apps-echo.yaml          # temporary, removed in Phase 2

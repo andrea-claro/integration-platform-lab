@@ -1,0 +1,14 @@
+# Guardrails per domain namespace (PLAN 1.5-1.6). Each overlay adds the
+# namespace-specific quota and allow rules on top of the common base.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: integration-platform-lab
+      app.kubernetes.io/component: guardrails
+resources:
+  - namespaces/platform
+  - namespaces/streaming
+  - namespaces/iot
+  - namespaces/apps
+  - namespaces/observability

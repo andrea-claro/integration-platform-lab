@@ -1,0 +1,16 @@
+# Defaults for containers that do not declare resources (e.g. chart hook jobs),
+# so every pod fits the namespace ResourceQuota. Workloads still set their own.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: container-defaults
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: 10m
+        memory: 64Mi
+      default:
+        memory: 256Mi
+      max:
+        memory: 2Gi
