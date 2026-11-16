@@ -111,7 +111,14 @@ DNS outage unrelated to the project.
 - `make lint` green; shellcheck now also covers `tests/smoke/`. A bash 3.2 incompatibility
   (empty array under `set -u`) caught and fixed in the smoke test.
 
-**Not yet verified:** running on the Mac (`make smoke`), then `make seal` / `make seal-backup`.
+**Verified on the Mac (2026-11-16):** all Argo CD apps Synced/Healthy; `make smoke` 5/5 PASS (HTTPS
+through the gateway, certificate issued by the internal root CA); `make seal-backup` saved the
+controller key; `make seal` produced six SealedSecrets (no plain values, checked before commit).
+
+**Found during verification:** the `.gitignore` rule `secrets/` was not anchored and silently
+ignored `gitops/observability/secrets/`, so two SealedSecrets were missing from `git status`.
+Anchored to `/secrets/`. Also: `mosquitto_passwd` warned about a world-readable temp file; the
+seal script now creates it with mode 600 (the in-cluster broker will mount it read-only, 0400).
 
 **Human review:** _to be filled in by Andrea_
 

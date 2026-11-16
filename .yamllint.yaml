@@ -9,6 +9,9 @@ rules:
   line-length:
     max: 140
     level: warning
+    # SealedSecret ciphertext is a single long base64 line by design.
+    ignore: |
+      **/sealedsecret-*.yaml
   document-start: disable
   truthy:
     allowed-values: ["true", "false"]

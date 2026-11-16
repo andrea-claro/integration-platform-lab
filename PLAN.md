@@ -121,9 +121,9 @@ Every task is implemented by an AI coding agent from this plan, reviewed by Andr
 
 ### Phase 1 — Platform base via GitOps (Tue 17 – Wed 18 Nov)
 
-- [ ] 1.1 Gateway API CRDs + Envoy Gateway; one `Gateway` with an HTTPS listener.
-- [ ] 1.2 cert-manager with a self-signed root → internal CA `ClusterIssuer`; gateway certificate issued from it.
-- [ ] 1.3 Sealed Secrets controller; `make seal` helper.
+- [x] 1.1 Gateway API CRDs + Envoy Gateway; one `Gateway` with an HTTPS listener.
+- [x] 1.2 cert-manager with a self-signed root → internal CA `ClusterIssuer`; gateway certificate issued from it.
+- [x] 1.3 Sealed Secrets controller; `make seal` helper.
 - [ ] 1.4 Namespaces, ServiceAccounts, Roles/RoleBindings, Argo CD `AppProject` per domain.
 - [ ] 1.5 Default-deny NetworkPolicies per namespace + explicit allows (DNS, gateway → apps, apps → Kafka, Prometheus scraping).
 - [ ] 1.6 ResourceQuota and LimitRange per namespace.

@@ -91,7 +91,8 @@ seal_mqtt() {
 
   # Hashed password file for the broker, built inside the official image.
   local passwd="$WORKDIR/passwd"
-  : >"$passwd"
+  # Mode 600: mosquitto_passwd warns about (and will refuse) world-readable files.
+  (umask 077 && : >"$passwd")
   docker run --rm -v "$WORKDIR:/work" "$MOSQUITTO_IMAGE" sh -c "
     mosquitto_passwd -b /work/passwd device-simulator '$MQTT_SIMULATOR_PASSWORD' &&
     mosquitto_passwd -b /work/passwd mqtt-kafka-bridge '$MQTT_BRIDGE_PASSWORD'" >/dev/null
