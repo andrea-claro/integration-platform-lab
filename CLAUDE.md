@@ -67,6 +67,7 @@ Created in Phase 0; keep this list up to date.
 - `make argocd-password` / `make argocd-ui` — admin password, UI on http://localhost:8080
 - `make seal` — seal secrets from `.env` into SealedSecret manifests; `make check-secrets` — plain-secret scan
 - `make seal-backup` — back up the Sealed Secrets key to `secrets/` (gitignored); `make bootstrap` restores it
+- `make smoke` — acceptance checks against the running cluster (`tests/smoke/*.sh`)
 - `make test` — ruff + pytest per service in the image `test` stage; `make lint` — repo checks in the toolbox image
 - `make build` / `make import` — build service images, import them into k3d
 - `make dev-up` / `make dev-smoke` / `make dev-down` — services with Docker Compose (local dev only, not a deployment path)

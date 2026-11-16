@@ -89,12 +89,15 @@ import: build ## Build and import the images into k3d (fast local iteration)
 	k3d image import -c $(CLUSTER_NAME) $(foreach s,$(SERVICES),$(IMAGE_PREFIX)$(s):$(IMAGE_TAG))
 
 # --- Quality -----------------------------------------------------------------
-.PHONY: test lint toolbox
+.PHONY: test lint toolbox smoke
 test: ## Unit tests + ruff for every service, inside Docker (test stage)
 	@set -e; for s in $(SERVICES); do \
 	  echo "==> $$s"; \
 	  docker build --target test --progress=plain -t ipl-test-$$s services/$$s; \
 	done
+
+smoke: ## Acceptance checks against the running cluster (tests/smoke)
+	@set -e; for t in tests/smoke/*.sh; do KUBE_CONTEXT=$(KUBE_CONTEXT) $$t; done
 
 toolbox: ## Build the pinned linter image
 	docker build -q -t $(TOOLBOX) tools >/dev/null
