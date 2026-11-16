@@ -12,13 +12,14 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
-  project: default
+  project: platform
   source:
     repoURL: https://github.com/andrea-claro/integration-platform-lab.git
     targetRevision: main
     path: gitops/platform/pki
   destination:
     server: https://kubernetes.default.svc
+    namespace: platform   # required by the AppProject destination check
   syncPolicy:
     automated:
       prune: true
