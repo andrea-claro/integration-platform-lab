@@ -124,9 +124,9 @@ Every task is implemented by an AI coding agent from this plan, reviewed by Andr
 - [x] 1.1 Gateway API CRDs + Envoy Gateway; one `Gateway` with an HTTPS listener.
 - [x] 1.2 cert-manager with a self-signed root → internal CA `ClusterIssuer`; gateway certificate issued from it.
 - [x] 1.3 Sealed Secrets controller; `make seal` helper.
-- [ ] 1.4 Namespaces, ServiceAccounts, Roles/RoleBindings, Argo CD `AppProject` per domain.
-- [ ] 1.5 Default-deny NetworkPolicies per namespace + explicit allows (DNS, gateway → apps, apps → Kafka, Prometheus scraping).
-- [ ] 1.6 ResourceQuota and LimitRange per namespace.
+- [x] 1.4 Namespaces, ServiceAccounts, Roles/RoleBindings, Argo CD `AppProject` per domain.
+- [x] 1.5 Default-deny NetworkPolicies per namespace + explicit allows (DNS, gateway → apps, apps → Kafka, Prometheus scraping).
+- [x] 1.6 ResourceQuota and LimitRange per namespace.
 - **Acceptance:** an echo service answers over HTTPS through the gateway with the internal CA; a pod in `iot` cannot reach `apps` unless allowed; `kubectl auth can-i` checks scripted in `tests/smoke`.
 
 ### Phase 2 — Integration workloads (Wed 18 – Thu 19 Nov)
