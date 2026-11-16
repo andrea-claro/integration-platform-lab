@@ -112,11 +112,11 @@ Every task is implemented by an AI coding agent from this plan, reviewed by Andr
 
 ### Phase 0 — Foundations (Mon 16 Nov)
 
-- [ ] 0.1 **Prerequisites on the Mac (Andrea, manual):** k3d, kubectl, helm, OpenTofu or Terraform, kubeseal, argocd CLI, jq (cloudflared already runs on the Mac); Docker Desktop memory ≥ 8 GB; public GitHub repo; GHCR enabled.
+- [x] 0.1 **Prerequisites on the Mac (Andrea, manual):** k3d, kubectl, helm, OpenTofu or Terraform, kubeseal, argocd CLI, jq (cloudflared already runs on the Mac); Docker Desktop memory ≥ 8 GB; public GitHub repo; GHCR enabled.
 - [x] 0.2 Repo skeleton (§4), MIT licence, `.gitignore`, `.env.example`.
-- [ ] 0.3 `cluster/k3d.yaml`: one server, Traefik disabled, local port mapping for HTTPS testing.
-- [ ] 0.4 `infra/bootstrap`: install Argo CD with the Helm provider and create the root Application pointing at `gitops/root`.
-- [ ] 0.5 `Makefile` targets `cluster`, `bootstrap`, `down`, `status`.
+- [x] 0.3 `cluster/k3d.yaml`: one server, Traefik disabled, local port mapping for HTTPS testing.
+- [x] 0.4 `infra/bootstrap`: install Argo CD with the Helm provider and create the root Application pointing at `gitops/root`.
+- [x] 0.5 `Makefile` targets `cluster`, `bootstrap`, `down`, `status`.
 - **Acceptance:** `make cluster && make bootstrap` → Argo CD healthy, root app `Synced/Healthy`.
 
 ### Phase 1 — Platform base via GitOps (Tue 17 – Wed 18 Nov)
