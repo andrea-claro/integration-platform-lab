@@ -48,7 +48,7 @@ What the project must prove to a reviewer:
           │ consumes
    Kafka (Strimzi, KRaft, 1 broker) ◄── mqtt-kafka-bridge ◄── Mosquitto (MQTT) ◄── device-simulator
 
-   Observability: kube-prometheus-stack (Prometheus, Alertmanager → Telegram, Grafana)
+   Observability: kube-prometheus-stack (Prometheus, Alertmanager, Grafana)
    Security: namespaces per domain · RBAC + Argo CD AppProjects · default-deny NetworkPolicies
              · ResourceQuota/LimitRange · one ServiceAccount per workload · Sealed Secrets
    Delivery: Terraform/OpenTofu bootstrap → Argo CD app-of-apps → Helm (3rd party) + Kustomize (own)
@@ -87,7 +87,7 @@ integration-platform-portfolio/
 ├── CLAUDE.md                instructions for coding agents
 ├── README.md
 ├── Makefile                 cluster, bootstrap, down, test, lint, break-*, status
-├── .env.example             tunnel token, Telegram bot, demo API key (never real values)
+├── .env.example             API keys, Grafana and MQTT passwords (never real values)
 ├── cluster/                 k3d config (Traefik disabled)
 ├── infra/
 │   ├── bootstrap/           Terraform/OpenTofu: Argo CD (Helm provider) + root Application
@@ -142,13 +142,13 @@ Every task is implemented by an AI coding agent from this plan, reviewed by Andr
 
 ### Phase 3 — Observability (Fri 20 Nov)
 
-- [ ] 3.1 kube-prometheus-stack with short retention and small resource requests.
-- [ ] 3.2 ServiceMonitors/PodMonitors: Kafka Exporter, cert-manager, our services (`/metrics`), kube-state-metrics. *(Envoy cut, see §6)*
-- [ ] 3.3 Grafana dashboard as code: "Integration Platform overview" (throughput, consumer lag, API latency/errors, cert expiry, pod health).
-- [ ] 3.4 PrometheusRules: `TelemetryPipelineStalled`, `KafkaConsumerLagHigh`, `PodCrashLooping`, `CertificateExpiringSoon`, `TargetDown`.
-- [ ] 3.5 `promtool test rules` unit tests for every alert.
+- [x] 3.1 kube-prometheus-stack with short retention and small resource requests.
+- [x] 3.2 ServiceMonitors/PodMonitors: Kafka Exporter, cert-manager, our services (`/metrics`), kube-state-metrics. *(Envoy cut, see §6)*
+- [x] 3.3 Grafana dashboard as code: "Integration Platform overview" (throughput, consumer lag, API latency/errors, cert expiry, pod health).
+- [x] 3.4 PrometheusRules: `TelemetryPipelineStalled`, `KafkaConsumerLagHigh`, `PodCrashLooping`, `CertificateExpiringSoon`, `TargetDown`.
+- [x] 3.5 `promtool test rules` unit tests for every alert.
 - ~~3.6 Alertmanager → Telegram (bot token as SealedSecret).~~ *(cut, see §6: alerts in the Alertmanager UI)*
-- **Acceptance:** every rule has a passing promtool test; every target is up; alerts reach Alertmanager.
+- **Acceptance:** every rule has a passing promtool test; every target is up; alerts reach Alertmanager. *(scripted in `tests/smoke/phase3-observability.sh`; to be confirmed on the Mac)*
 
 ### Phase 4 — Incident lab & public exposure (Sat 21 – Sun 22 Nov)
 
