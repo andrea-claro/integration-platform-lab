@@ -1,0 +1,157 @@
+# promtool unit tests for gitops/observability/rules/integration-platform.yaml
+# (run with `make test-rules`). Each alert: one case that fires, one that does not.
+rule_files:
+  - integration-platform.rules.yaml
+
+evaluation_interval: 30s
+
+tests:
+  # --- TelemetryPipelineStalled ------------------------------------------------
+  - name: pipeline stalls when the bridge stops delivering
+    interval: 30s
+    input_series:
+      # 2 records/s for 10 minutes, then flat (Kafka unreachable).
+      - series: 'bridge_kafka_messages_produced_total{job="mqtt-kafka-bridge"}'
+        values: '0+60x20 1200x20'
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: TelemetryPipelineStalled
+        exp_alerts: []
+      - eval_time: 17m
+        alertname: TelemetryPipelineStalled
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: No telemetry is reaching Kafka
+              description: >-
+                The MQTT-Kafka bridge has not delivered any record to telemetry.raw for
+                at least 3 minutes, so the API serves stale readings.
+              runbook_url: https://github.com/andrea-claro/integration-platform-lab/blob/main/docs/runbooks/TelemetryPipelineStalled.md
+
+  - name: pipeline stalled when the bridge is not scraped at all
+    interval: 30s
+    input_series:
+      - series: 'up{job="device-simulator"}'
+        values: '1x20'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: TelemetryPipelineStalled
+        exp_alerts:
+          - exp_labels:
+              severity: critical
+            exp_annotations:
+              summary: No telemetry is reaching Kafka
+              description: >-
+                The MQTT-Kafka bridge has not delivered any record to telemetry.raw for
+                at least 3 minutes, so the API serves stale readings.
+              runbook_url: https://github.com/andrea-claro/integration-platform-lab/blob/main/docs/runbooks/TelemetryPipelineStalled.md
+
+  # --- KafkaConsumerLagHigh ----------------------------------------------------
+  - name: consumer lag above 500 for 5 minutes
+    interval: 30s
+    input_series:
+      - series: 'kafka_consumergroup_lag{consumergroup="telemetry-api",topic="telemetry.raw",partition="0"}'
+        values: '0x5 400x20'
+      - series: 'kafka_consumergroup_lag{consumergroup="telemetry-api",topic="telemetry.raw",partition="1"}'
+        values: '0x5 300x20'
+      # Another group is not this alert's business.
+      - series: 'kafka_consumergroup_lag{consumergroup="other",topic="telemetry.raw",partition="0"}'
+        values: '9000x25'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: KafkaConsumerLagHigh
+        exp_alerts: []
+      - eval_time: 9m
+        alertname: KafkaConsumerLagHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              consumergroup: telemetry-api
+              topic: telemetry.raw
+            exp_annotations:
+              summary: Consumer group telemetry-api is falling behind on telemetry.raw
+              description: >-
+                700 records are waiting to be consumed (about 2 records/s are
+                produced), so the API is minutes behind the devices.
+              runbook_url: https://github.com/andrea-claro/integration-platform-lab/blob/main/docs/runbooks/KafkaConsumerLagHigh.md
+
+  # --- CertificateExpiringSoon -------------------------------------------------
+  # promtool evaluates at t = eval_time, so expiry timestamps are relative to 0.
+  - name: certificate expiring in 20 days fires, 60 days does not
+    interval: 1m
+    input_series:
+      - series: 'certmanager_certificate_expiration_timestamp_seconds{namespace="platform",name="gateway-tls"}'
+        values: '1728000x20'      # 20 days
+      - series: 'certmanager_certificate_expiration_timestamp_seconds{namespace="platform",name="internal-root-ca"}'
+        values: '5184000x20'      # 60 days
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: CertificateExpiringSoon
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: platform
+              name: gateway-tls
+            exp_annotations:
+              summary: Certificate platform/gateway-tls expires in less than 21 days
+              description: >-
+                It expires in 19d 23h 45m 0s and should have been
+                renewed already.
+              runbook_url: https://github.com/andrea-claro/integration-platform-lab/blob/main/docs/runbooks/CertificateExpiringSoon.md
+
+  # --- PodCrashLooping ---------------------------------------------------------
+  - name: container in CrashLoopBackOff for 5 minutes
+    interval: 30s
+    input_series:
+      - series: >-
+          kube_pod_container_status_waiting_reason{namespace="streaming",pod="ipl-dual-role-0",
+          container="kafka",reason="CrashLoopBackOff"}
+        values: '0x4 1x20'
+      - series: >-
+          kube_pod_container_status_waiting_reason{namespace="iot",pod="mosquitto-0",
+          container="mosquitto",reason="ContainerCreating"}
+        values: '1x24'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: PodCrashLooping
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: PodCrashLooping
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              namespace: streaming
+              pod: ipl-dual-role-0
+              container: kafka
+            exp_annotations:
+              summary: streaming/ipl-dual-role-0 (kafka) is crash looping
+              description: The container keeps restarting and is in CrashLoopBackOff.
+              runbook_url: https://github.com/andrea-claro/integration-platform-lab/blob/main/docs/runbooks/PodCrashLooping.md
+
+  # --- TargetDown --------------------------------------------------------------
+  - name: target down for 5 minutes
+    interval: 30s
+    input_series:
+      - series: 'up{job="mqtt-kafka-bridge",namespace="iot",pod="mqtt-kafka-bridge-0"}'
+        values: '1x4 0x20'
+      - series: 'up{job="telemetry-api",namespace="apps",pod="telemetry-api-0"}'
+        values: '1x24'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: TargetDown
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: TargetDown
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              job: mqtt-kafka-bridge
+              namespace: iot
+              pod: mqtt-kafka-bridge-0
+            exp_annotations:
+              summary: Prometheus cannot scrape mqtt-kafka-bridge (iot/mqtt-kafka-bridge-0)
+              description: >-
+                The target has been down for 5 minutes: the workload is not running,
+                or a NetworkPolicy blocks the scrape.
+              runbook_url: https://github.com/andrea-claro/integration-platform-lab/blob/main/docs/runbooks/TargetDown.md
