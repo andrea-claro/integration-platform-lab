@@ -131,3 +131,22 @@ def test_root_redirects_to_docs(client):
     r = client.get("/", follow_redirects=False)
     assert r.status_code == 307
     assert r.headers["location"] == "/docs"
+
+
+def test_openapi_declares_gateway_api_key(client):
+    # The key is enforced by Envoy Gateway; the spec only documents it so that
+    # /docs offers "Authorize" and sends the header.
+    spec = client.get("/openapi.json").json()
+    assert spec["components"]["securitySchemes"]["ApiKey"] == {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-api-key",
+        "description": spec["components"]["securitySchemes"]["ApiKey"]["description"],
+    }
+    for path, item in spec["paths"].items():
+        expected = [{"ApiKey": []}] if path.startswith("/v1/") else None
+        assert item["get"].get("security") == expected, path
+
+
+def test_service_does_not_enforce_the_key(client):
+    assert client.get("/v1/devices").status_code == 200
