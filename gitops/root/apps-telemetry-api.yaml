@@ -1,9 +1,9 @@
-# TEMPORARY (Phase 1 acceptance): echo service behind the gateway.
-# Removed when telemetry-api gets its own route in Phase 2.
+# Telemetry API with its routes and gateway policies (apps domain). Needs the
+# Gateway API, Envoy Gateway and SealedSecret CRDs from the platform project.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: apps-echo
+  name: apps-telemetry-api
   namespace: argocd
   labels:
     app.kubernetes.io/part-of: integration-platform-lab
@@ -16,7 +16,7 @@ spec:
   source:
     repoURL: https://github.com/andrea-claro/integration-platform-lab.git
     targetRevision: main
-    path: gitops/apps/echo
+    path: gitops/apps/telemetry-api
   destination:
     server: https://kubernetes.default.svc
     namespace: apps

@@ -1,0 +1,19 @@
+# Telemetry API (PLAN 2.5-2.6): FastAPI over the Kafka stream, behind the shared
+# Gateway with API-key auth and local rate limits.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: apps
+labels:
+  - pairs:
+      app.kubernetes.io/name: telemetry-api
+    includeSelectors: true
+  - pairs:
+      app.kubernetes.io/component: api
+      app.kubernetes.io/part-of: integration-platform-lab
+      app.kubernetes.io/version: 0.1.0
+    includeTemplates: true
+resources:
+  - sealedsecret-api-keys.yaml
+  - telemetry-api.yaml
+  - routes.yaml
+  - policies.yaml

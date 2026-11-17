@@ -4,8 +4,8 @@ metadata:
   name: allow-from-gateway
 spec:
   # Why: the Envoy proxies of the shared Gateway forward routed requests to the
-  # API (and, until Phase 2, the echo service). Which Services are reachable is
-  # decided by the HTTPRoutes; nothing else may connect to pods in "apps".
+  # API. Which paths are reachable is decided by the HTTPRoutes; nothing else may
+  # connect to pods in "apps", and only on the HTTP container port.
   podSelector: {}
   policyTypes:
     - Ingress
@@ -19,3 +19,30 @@ spec:
               app.kubernetes.io/name: envoy
               app.kubernetes.io/component: proxy
               app.kubernetes.io/managed-by: envoy-gateway
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-telemetry-api-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: telemetry-api
+  policyTypes:
+    - Egress
+  egress:
+    # Why: consume telemetry.raw from the Kafka pod on the plain listener.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: streaming
+          podSelector:
+            matchLabels:
+              strimzi.io/cluster: ipl
+              strimzi.io/name: ipl-kafka
+      ports:
+        - protocol: TCP
+          port: 9092
