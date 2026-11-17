@@ -22,6 +22,7 @@ node itself (kubelet probes, API server → admission webhooks) is always accept
 | mqtt-kafka-bridge (`iot`) | Kafka pod (`streaming`) | 9092 | produce to `telemetry.raw` / `telemetry.dlq` |
 | telemetry-api (`apps`) | Kafka pod (`streaming`) | 9092 | consume `telemetry.raw` |
 | Strimzi operator, Topic Operator (`streaming`) | Kubernetes API (node IP) | 6443 | watch and update resources |
+| Kafka pod (`streaming`) | Kubernetes API (node IP) | 6443 | read its own configuration Secret at startup |
 | Strimzi operator (`streaming`) | Kafka pod | 9090, 9091, 8443 | admin calls, KRaft quorum, Kafka agent |
 | Kafka pod, Topic Operator, Kafka Exporter (`streaming`) | Kafka pod | 9090/9091 (Kafka), 9091 (others) | quorum and replication, topic management, lag metrics |
 
