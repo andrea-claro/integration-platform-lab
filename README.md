@@ -9,7 +9,11 @@ runbooks that walk through diagnosis and recovery.
 It is a hands-on lab on operating such a platform: reliability, security, clear operations and
 troubleshooting matter more than features.
 
-<!-- LIVE-LINKS -->
+> **Status.** Built and verified phase by phase on a real k3d cluster (Phases 0–2 accepted with
+> `make smoke`, [evidence](docs/evidence/)); Phases 3–4 validated in CI and against the real CRDs.
+> The lab is shared as a repository rather than a live system: the full stack is more than a laptop
+> keeps running next to other work, which produced a real control-plane incident
+> ([postmortem](docs/postmortems/2026-11-17-k3s-control-plane-crash.md)).
 
 ## Two-minute tour
 
@@ -21,6 +25,8 @@ troubleshooting matter more than features.
 | At-least-once MQTT → Kafka, with back-pressure instead of data loss | [`gitops/iot`](gitops/iot), [`services/mqtt-kafka-bridge`](services/mqtt-kafka-bridge) |
 | Symptom-first alerts, each with a promtool test and a runbook | [`gitops/observability`](gitops/observability), [`docs/runbooks`](docs/runbooks) |
 | An incident injected, detected, diagnosed and recovered through Git | [`incidents`](incidents), [runbook](docs/runbooks/incident-dns.md), [postmortems](docs/postmortems) |
+| Two real incidents met while building it, written up blamelessly | [`docs/postmortems`](docs/postmortems) |
+| What was verified where (sandbox, CI, real cluster) | [`docs/evidence`](docs/evidence) |
 | How it was built with an AI coding agent, including what was corrected | [`docs/how-this-was-built.md`](docs/how-this-was-built.md) |
 
 ## Architecture
@@ -47,7 +53,6 @@ flowchart LR
   br -- telemetry.raw --> k
   k -- consumer group --> api
   gw -- /v1, /docs --> api
-  gw -. status page .-> graf
   client((clients)) -- HTTPS --> gw
   prom -. scrapes .-> sim & br & api & k
 ```
@@ -61,7 +66,7 @@ flowchart LR
 | Services | Python 3.12: `device-simulator`, `mqtt-kafka-bridge`, `telemetry-api`; images on GHCR |
 | Observability | kube-prometheus-stack (Prometheus, Alertmanager, Grafana, kube-state-metrics), lean |
 | Secrets | Sealed Secrets — [ADR-005](docs/adr/ADR-005-sealed-secrets.md) |
-| Exposure | Cloudflare Tunnel connector on the host; only the status page and the API docs are public |
+| Exposure | none: everything binds to `127.0.0.1`; UIs through `kubectl port-forward` |
 
 ### Local → AWS
 
@@ -81,8 +86,8 @@ Every local component has a production counterpart ([ADR-006](docs/adr/ADR-006-a
 
 ## Quickstart
 
-Prerequisites (macOS): Docker Desktop (≥ 8 GB memory), `k3d`, `kubectl`, `opentofu` (or
-`terraform`), `kubeseal`, `jq`. `scripts/install-tools-macos.sh` installs pinned, SHA-256 verified
+Prerequisites (macOS or Linux): Docker with **≥ 8 GB memory and 4+ CPUs** for the cluster (it uses
+about 4–5 GB once everything runs), `k3d`, `kubectl`, `opentofu` (or `terraform`), `kubeseal`, `jq`. `scripts/install-tools-macos.sh` installs pinned, SHA-256 verified
 binaries. Linters and tests run inside Docker.
 
 ```bash
@@ -91,12 +96,31 @@ make test && make lint       # unit tests; yamllint, shellcheck, ruff, kubeconfo
 
 make cluster                 # k3d cluster "ipl", HTTPS on 127.0.0.1:8443
 make bootstrap               # OpenTofu: Argo CD + root Application (Argo CD syncs from GitHub)
+make import                  # optional: local image builds, if the GHCR images are not pullable
 make status                  # Argo CD apps, pods not ready, firing alerts
 make smoke                   # acceptance checks of every phase
 
 make grafana-ui              # http://localhost:3000, dashboard "Integration Platform overview"
 make argocd-ui               # http://localhost:8080 (local only, never published)
 ```
+
+### Running it from a fork
+
+Argo CD syncs from a Git repository, and the committed SealedSecrets can only be decrypted by the
+original cluster's key. To run the lab yourself:
+
+```bash
+# in your fork
+scripts/set-repo-url.sh https://github.com/<you>/integration-platform-lab.git   # every Argo CD app -> your fork
+make env                         # .env with generated secrets; set GITOPS_REPO_URL to your fork
+git commit -am "point Argo CD at my fork" && git push
+make cluster && make bootstrap   # Argo CD deploys from your fork; workloads wait for their secrets
+make seal                        # re-seal every secret for your cluster's key (controller is running)
+git commit -am "re-seal secrets for my cluster" && git push   # Argo CD syncs, pods start
+make status && make smoke
+```
+
+The service images on GHCR are public, so no image build is needed.
 
 Try the API (the keys come from the decrypted Secret in the cluster):
 
@@ -129,7 +153,8 @@ and the delivery guarantee: messages queued in Mosquitto during the outage reach
   dropped, no `restricted` Pod Security warnings.
 - Pod Security `baseline` enforced in every domain namespace, `restricted` audited.
 - Secrets in Git only as SealedSecrets; `make check-secrets` fails on plain Secrets.
-- Public surface: only routed hostnames through the tunnel; Argo CD and admin UIs local only.
+- No public surface: the k3d API and HTTPS ports bind to `127.0.0.1`; Argo CD and every UI only
+  through port-forward.
 
 ## Reliability choices
 

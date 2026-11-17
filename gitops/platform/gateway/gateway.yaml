@@ -1,6 +1,6 @@
 # The single entry point for HTTP traffic into the cluster (ADR-002).
-# Locally: https://<name>.ipl.localhost:8443 ; publicly only through the
-# Cloudflare tunnel connector on the Mac, for explicitly routed hostnames.
+# Locally: https://<name>.ipl.localhost:8443 (k3d maps 127.0.0.1:8443 -> :443).
+# Nothing is published beyond the machine's loopback interface.
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:

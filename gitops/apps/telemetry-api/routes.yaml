@@ -3,7 +3,6 @@
 #   telemetry-api-docs  /, /docs, /openapi.json  public, so visitors can read the
 #                       docs and try the API with the published demo key
 # Nothing else is routed: /healthz, /readyz and /metrics stay cluster-internal.
-# The public hostname api.<domain> is added in Phase 4 (tunnel exposure).
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:

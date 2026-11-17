@@ -1,0 +1,73 @@
+# Output of `make status` and `make smoke` on the real cluster (k3d on a MacBook Pro,
+# Docker Desktop), 2026-11-17 22:58 CET, after the Phase 2 rollout and the Kafka fix (PR #6).
+# Copied verbatim from the terminal.
+
+$ make status
+== Argo CD applications
+NAME                    SYNC     HEALTH    REVISION
+apps-telemetry-api      Synced   Healthy   be3d0c5b72bb198b1890de6063c7886b6ff431e6
+cert-manager            Synced   Healthy   v1.21.3
+envoy-gateway           Synced   Healthy   sha256:be1b8f163a338f94e7d6532336c08d6856fc70a0b790ac14a2826a54d23e0dd3
+iot-device-simulator    Synced   Healthy   be3d0c5b72bb198b1890de6063c7886b6ff431e6
+iot-mosquitto           Synced   Healthy   be3d0c5b72bb198b1890de6063c7886b6ff431e6
+iot-mqtt-kafka-bridge   Synced   Healthy   be3d0c5b72bb198b1890de6063c7886b6ff431e6
+platform-base           Synced   Healthy   be3d0c5b72bb198b1890de6063c7886b6ff431e6
+platform-gateway        Synced   Healthy   be3d0c5b72bb198b1890de6063c7886b6ff431e6
+platform-guardrails     Synced   Healthy   be3d0c5b72bb198b1890de6063c7886b6ff431e6
+platform-pki            Synced   Healthy   be3d0c5b72bb198b1890de6063c7886b6ff431e6
+root                    Synced   Healthy   be3d0c5b72bb198b1890de6063c7886b6ff431e6
+sealed-secrets          Synced   Healthy   2.22.0
+streaming-kafka         Synced   Healthy   be3d0c5b72bb198b1890de6063c7886b6ff431e6
+strimzi                 Synced   Healthy   sha256:f50e7cc433b2ba5e271798ff41f239b2dbbf1257d610580ff2fa1acd71a6fd80
+
+== Pods not ready
+(none)
+
+$ make smoke
+== Phase 1: gateway + internal CA
+  PASS  ClusterIssuer internal-ca is Ready
+  PASS  Certificate platform/gateway-tls is Ready
+  PASS  Gateway platform/public is Programmed
+  PASS  telemetry-api answered over HTTPS via the gateway (TLS verified against the internal CA)
+  PASS  certificate issuer=O=integration-platform-lab, CN=integration-platform-lab internal root CA
+Phase 1 gateway checks passed.
+== Phase 1: guardrails
+  PASS  namespace platform: default deny, quota, limit range
+  PASS  namespace streaming: default deny, quota, limit range
+  PASS  namespace iot: default deny, quota, limit range
+  PASS  namespace apps: default deny, quota, limit range
+  PASS  namespace observability: default deny, quota, limit range
+  PASS  pod in iot cannot reach telemetry-api.apps (1 ready endpoint(s); connection rejected by NetworkPolicy, curl exit 7)
+  PASS  system:serviceaccount:apps:telemetry-api cannot: list secrets -n apps
+  PASS  system:serviceaccount:apps:telemetry-api cannot: get pods -n platform
+  PASS  system:serviceaccount:apps:telemetry-api cannot: create deployments -n apps
+  PASS  system:serviceaccount:apps:telemetry-api cannot: get configmaps -n apps
+  PASS  no ServiceAccount outside kube-system is bound to cluster-admin
+  PASS  every Application except root runs in its domain AppProject
+Phase 1 guardrail checks passed.
+== Phase 2: integration workloads
+  PASS  Application strimzi is Synced/Healthy
+  PASS  Application streaming-kafka is Synced/Healthy
+  PASS  Application iot-mosquitto is Synced/Healthy
+  PASS  Application iot-device-simulator is Synced/Healthy
+  PASS  Application iot-mqtt-kafka-bridge is Synced/Healthy
+  PASS  Application apps-telemetry-api is Synced/Healthy
+  PASS  streaming/kafka/ipl is Ready
+  PASS  streaming/kafkatopic/telemetry-raw is Ready
+  PASS  streaming/kafkatopic/telemetry-dlq is Ready
+  PASS  deployment iot/mosquitto is available
+  PASS  deployment iot/device-simulator is available
+  PASS  deployment iot/mqtt-kafka-bridge is available
+  PASS  deployment apps/telemetry-api is available
+  PASS  securitypolicy/telemetry-api-key accepted by Envoy Gateway
+  PASS  backendtrafficpolicy/telemetry-api-rate-limit accepted by Envoy Gateway
+  PASS  no API key -> 401
+  PASS  wrong API key -> 401
+  PASS  fresh readings over HTTPS: 10 device(s), newest 4s old (simulator -> MQTT -> Kafka -> API)
+  PASS  /docs is public -> 200
+  PASS  /openapi.json is public -> 200
+  PASS  /metrics is not routed -> 404
+  PASS  /healthz is not routed -> 404
+  PASS  burst of 30 with the demo key: 20 x 200, 10 x 429
+  PASS  admin key unaffected by the demo burst -> 200
+Phase 2 integration checks passed.

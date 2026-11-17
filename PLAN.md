@@ -9,7 +9,7 @@ Build, AI-first and GitOps-first, a small integration platform on Kubernetes tha
 streaming, API management and IoT, run reliably and securely, with networking, TLS, observability and
 incident response done properly.
 
-Everything runs locally in containers at zero cost. Selected read-only views are published through Cloudflare Tunnel.
+Everything runs locally in containers at zero cost. The lab is shared as a repository; nothing is published (scope update, §6).
 
 What the project must prove to a reviewer:
 
@@ -25,8 +25,7 @@ What the project must prove to a reviewer:
 - **Zero cost.** No cloud resources. Only free, open-source components.
 - **Host:** MacBook Pro (Intel x64) with Docker Desktop. Docker memory **≥ 8 GB** for this project.
 - **Runs in parallel with `partner-file-gateway`.** Agents may work on both; Andrea reviews both daily.
-- **Exposure:** the Cloudflare Tunnel connector already running on the Mac (remote-managed, public hostnames set in the Cloudflare dashboard) → Envoy Gateway on `127.0.0.1:8443`; no inbound ports, no cloudflared in the cluster.
-- **Public surface:** a shared read-only Grafana dashboard and the telemetry API docs, nothing else. Argo CD is never published (local only, `make argocd-ui`).
+- **Exposure:** none. Envoy Gateway on `127.0.0.1:8443`, UIs through port-forward. *(Originally: two read-only hostnames through a Cloudflare Tunnel; dropped, see §6.)*
 - **No ingress-nginx** (retired March 2026) → Gateway API. **No Bitnami charts or images** (free catalog discontinued in 2025).
 - **Timeline:** MVP public by Mon 23 Nov; later phases follow from Tue 24 Nov.
 - **Neutral branding:** no employer names or logos anywhere.
@@ -34,8 +33,8 @@ What the project must prove to a reviewer:
 ## 3. Architecture
 
 ```
-             Cloudflare Tunnel (connector on the Mac → https://127.0.0.1:8443)
-                         status.<domain>      api.<domain>
+                   clients on the same machine → https://127.0.0.1:8443
+                         api.ipl.localhost
                                       │
                                       ▼
                     Envoy Gateway  (Gateway API, TLS from cert-manager internal CA)
@@ -150,18 +149,18 @@ Every task is implemented by an AI coding agent from this plan, reviewed by Andr
 - ~~3.6 Alertmanager → Telegram (bot token as SealedSecret).~~ *(cut, see §6: alerts in the Alertmanager UI)*
 - **Acceptance:** every rule has a passing promtool test; every target is up; alerts reach Alertmanager. *(scripted in `tests/smoke/phase3-observability.sh`; to be confirmed on the Mac)*
 
-### Phase 4 — Incident lab & public exposure (Sat 21 – Sun 22 Nov)
+### Phase 4 — Incident lab (Sat 21 – Sun 22 Nov)
 
 - [x] 4.1 Incident framework: `make break-<name>` / `make restore-<name>`. Faults are injected either as live drift (with Argo CD self-heal paused for that app) or as a bad commit on a branch; recovery always goes through Git/Argo CD.
 - [x] 4.2 **Scenario:** `dns` (bridge pointed at a wrong Kafka hostname). *(`cert` cut, see §6)*
-- [ ] 4.3 For each scenario: runbook in `docs/runbooks/` (symptom → alert → diagnosis commands → root cause → fix) and a short postmortem in `docs/postmortems/`. *(runbook done; postmortem written from the first run on the Mac)*
-- [ ] 4.4 Public hostnames on the existing tunnel (Cloudflare dashboard) → `https://127.0.0.1:8443` (Envoy Gateway; origin server name = hostname): `status.<domain>` (shared read-only Grafana dashboard) and `api.<domain>` (API docs + demo key with tight rate limit). Tunnel config documented in `docs/exposure.md`; Argo CD stays local only.
-- **Acceptance:** both scenarios reproducible end to end; public URLs work over HTTPS; Argo CD and every other hostname not reachable from outside.
+- [x] 4.3 For each scenario: runbook in `docs/runbooks/` (symptom → alert → diagnosis commands → root cause → fix) and a short postmortem in `docs/postmortems/`. *(postmortems written for the two real incidents met while building, see §6)*
+- ~~4.4 Public hostnames on the existing tunnel (Cloudflare dashboard) → `https://127.0.0.1:8443` (Envoy Gateway; origin server name = hostname): `status.<domain>` (shared read-only Grafana dashboard) and `api.<domain>` (API docs + demo key with tight rate limit). Tunnel config documented in `docs/exposure.md`; Argo CD stays local only.~~ *(cut, see §6)*
+- **Acceptance:** the scenario is reproducible end to end with a runbook. *(scripted; not yet run on the cluster, see §6)*
 
 ### Phase 5 — CI, docs, polish (Sun 22 – Mon 23 Nov)
 
 - [x] 5.1 GitHub Actions: yamllint, kubeconform on rendered manifests, `promtool test rules`, ruff + pytest, `tofu fmt` + `validate`, image build → GHCR. *(kube-linter, Trivy cut, see §6)*
-- [x] 5.2 README: what it is, architecture diagram, local ↔ AWS table, quickstart, incident lab walkthrough, live links. *(live links added with the public exposure)*
+- [x] 5.2 README: what it is, architecture diagram, local ↔ AWS table, quickstart, incident lab walkthrough, live links. *(no live links: exposure cut, see §6)*
 - [x] 5.3 `docs/how-this-was-built.md`: agent workflow, review checklist, examples of AI output corrected or rejected.
 - [x] 5.4 ADR-001 to ADR-006.
 - **Acceptance:** CI green on `main`; a reviewer understands the platform and the incident lab in two minutes.
@@ -186,6 +185,14 @@ security baseline and one incident diagnosed end to end. Cut: Envoy scraping and
 alert (the API's own metrics cover the dashboard; `TelemetryPipelineStalled` replaces the alert),
 node-exporter and the chart's default rules and dashboards, Telegram, the `cert` scenario,
 kube-linter and Trivy in CI. Phase 6 moves to the README as next steps.
+
+**Scope update (17 Nov, late).** The full stack (Argo CD, Kafka, Prometheus, a dozen operators) is
+more than the laptop keeps running reliably next to other work: after Phase 3 the k3s control plane
+crashed on its SQLite datastore (postmortem in `docs/postmortems/`). Decision: the lab is shared
+as a **repository**, not as a live system. Public exposure (4.4) is cut; k3s moves to embedded
+etcd; the evidence from the real cluster is kept in `docs/evidence/`. Phases 0–2 were accepted on
+the cluster; Phases 3–4 are validated in the sandbox (promtool, server-side dry-run) and were
+deployed once on the cluster before the crash, so their acceptance on a rebuilt cluster is open.
 
 ## 7. Resource budget
 

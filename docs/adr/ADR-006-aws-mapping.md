@@ -24,7 +24,7 @@ the concepts rather than a local-only setup.
 | Strimzi Kafka, one node | Amazon MSK, 3 brokers, IAM/mTLS auth | ADR-004 |
 | Mosquitto | AWS IoT Core (MQTT, per-device certificates) | |
 | kube-prometheus-stack | Amazon Managed Prometheus + Managed Grafana, or the same stack | rules and dashboards unchanged |
-| Cloudflare Tunnel to the laptop | public ALB/NLB, or CloudFront + WAF | |
+| k3d loopback port mapping (no public exposure) | public NLB/ALB, or CloudFront + WAF | |
 | GitHub Actions → GHCR | GitHub Actions (OIDC) → ECR | |
 
 ## Consequences

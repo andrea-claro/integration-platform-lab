@@ -9,7 +9,7 @@ IoT devices (simulated) publish telemetry over MQTT. A bridge moves it into Kafk
 and is exposed through Envoy Gateway with TLS, rate limiting and authentication. Prometheus, Alertmanager and
 Grafana watch everything, and an **incident lab** injects realistic faults (expired certificate, wrong DNS name,
 blocked network path, OOM) with runbooks showing how to diagnose and fix them end to end.
-Selected read-only views are published on the internet through Cloudflare Tunnel.
+Nothing is published on the internet: the lab is shared as a repository and runs on the reviewer's machine.
 
 It is a hands-on lab on operating an integration platform (streaming, API management,
 file transfer, IoT). Reliability, security, clear operations and troubleshooting matter more than features.
@@ -23,9 +23,8 @@ The full plan, phases and acceptance criteria are in **PLAN.md**. Work only on t
   Manual `kubectl apply` is allowed only in `make bootstrap` and in `incidents/*/inject.sh` / `restore.sh`.
 - **Secrets:** never commit plain `Secret` manifests or real values. Use SealedSecrets; local values live in `.env`
   (gitignored) and every variable is listed in `.env.example` with a placeholder.
-- **Public surface** only through the Cloudflare Tunnel connector on the Mac, and only for hostnames with an explicit
-  HTTPRoute (`status.`, `api.`). Never publish Argo CD or other admin UIs. No NodePort or hostPort exposure besides
-  the local k3d port mapping, which binds to 127.0.0.1 only.
+- **No public surface.** Everything binds to 127.0.0.1 (k3d API and HTTPS port mapping). No NodePort or hostPort,
+  no tunnels; Argo CD and every UI only through `kubectl port-forward`.
 - **No ingress-nginx** (retired) → Gateway API with Envoy Gateway. **No Bitnami charts or images** → official charts/images only
   (one documented exception: the Sealed Secrets project's own chart and image, ADR-005).
 - **Pin versions** of every chart and image; check the docs of the pinned version before writing CRDs or policies.
@@ -41,7 +40,7 @@ The full plan, phases and acceptance criteria are in **PLAN.md**. Work only on t
 - **Integration:** Strimzi Kafka (KRaft, 1 broker), Eclipse Mosquitto.
 - **Our services (Python 3.12):** `device-simulator`, `mqtt-kafka-bridge`, `telemetry-api` (FastAPI). Images on GHCR.
 - **Observability:** kube-prometheus-stack (Prometheus, Alertmanager UI, Grafana), promtool-tested rules.
-- **Secrets:** Sealed Secrets. **Exposure:** existing Cloudflare Tunnel connector on the Mac → Envoy Gateway; admin UIs local only.
+- **Secrets:** Sealed Secrets. **Exposure:** none; Envoy Gateway on `127.0.0.1:8443`, UIs through port-forward.
 - **Quality:** ruff, pytest, yamllint, kubeconform, kube-linter, Trivy config, promtool.
 
 ## Conventions

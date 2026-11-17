@@ -24,7 +24,7 @@ and a human review section.
 - RBAC and AppProjects: no new cluster-scoped kinds without a reason; workloads without API rights.
 - Secrets: only SealedSecrets; nothing sensitive in logs, manifests or the public repo.
 - Resources within PLAN §7; versions pinned; docs of the pinned version actually checked.
-- Exposure: nothing new reachable from outside except the explicitly routed hostnames.
+- Exposure: nothing reachable from outside the machine.
 
 ## Corrected or rejected along the way (highlights)
 
@@ -39,6 +39,8 @@ and a human review section.
 | interrupted session | Phase 2 work lost because nothing had been pushed | replayed from the transcript; push after every commit |
 | agent's own checks | promtool tests that might not bite | mutation check: weakening a rule must fail its test |
 | scope review (human) | a lab for reviewers does not need every feature | lean scope for Phases 3–5 (PLAN §6) |
+| Phase 3 on the Mac | Grafana OOM-killed at 256 Mi (a dozen plugin processes) | 192/512 Mi, after reading the kernel log |
+| Phase 3 on the Mac | k3s exited on its SQLite datastore under the operators' load | embedded etcd; lab shared as a repository |
 
 ---
 
@@ -385,6 +387,36 @@ scenario needs the cluster: next step on the Mac.
 - This file: workflow, review checklist and the highlights of what was corrected along the way.
 
 **Verified (agent sandbox):** lint green; Mermaid diagram validated.
+
+**Human review:** _to be filled in by Andrea_
+
+---
+
+## 2026-11-17 — Wrap-up: shared as a repository
+
+**Context.** After Phase 3 the laptop cluster crashed twice within an hour: Grafana OOM-killed at
+its limit, then the k3s control plane on its SQLite datastore. Andrea decided to share the lab as a
+repository instead of keeping a live, publicly exposed cluster. See
+[the postmortem](postmortems/2026-11-17-k3s-control-plane-crash.md).
+
+**Produced**
+
+- Diagnosis from evidence before changes: kernel log (`dmesg`) for the OOM kill, `docker stats`
+  for VM memory, k3s logs for the datastore failure. Docker's `OOMKilled` flag on the node pointed
+  the wrong way (it counts kills anywhere in the container's cgroup tree).
+- Fixes: Grafana 192/512 Mi (PR #10); k3s on embedded etcd with metrics-server disabled
+  (`cluster/k3d.yaml`, ADR-001).
+- Public exposure (4.4) cut; references to the tunnel removed from the rules, plan, manifests and
+  docs. CLAUDE.md now says: no public surface.
+- `docs/postmortems/`: the two real incidents (Kafka crash loop from a NetworkPolicy, k3s control
+  plane crash). They replace the planned postmortem of a lab run.
+- `docs/evidence/`: what was verified where, with the verbatim Phase 1–2 smoke output from the
+  real cluster.
+- README: status line, "running it from a fork" (re-seal secrets for your own cluster; the GHCR
+  images are public), resource requirements.
+
+**Open:** rebuild on etcd and run `make smoke` for Phase 3 and `make break-dns` / `restore-dns`;
+a dead man's switch delivered outside the cluster.
 
 **Human review:** _to be filled in by Andrea_
 

@@ -12,6 +12,9 @@ Rules of the lab:
   state back. Nothing is fixed by hand.
 - `restore.sh` prints a timeline (injected, alert fired, restore, recovered) for the postmortem.
 
+Status: the `dns` scenario is checked by shellcheck and CI but has not been run end to end yet: the
+laptop cluster was retired before it (see [evidence](../docs/evidence/)).
+
 | Scenario | Fault | Detected by | Runbook | Postmortem |
 |---|---|---|---|---|
 | `dns` | bridge points at a Kafka hostname in a namespace that does not exist | `TelemetryPipelineStalled` | [incident-dns.md](../docs/runbooks/incident-dns.md) | [docs/postmortems](../docs/postmortems/) |
