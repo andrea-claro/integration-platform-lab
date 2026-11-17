@@ -247,6 +247,11 @@ pod. The sandbox dry-run could not catch it, because NetworkPolicies are enforce
 run. Also: the k3d cluster had stopped (Docker restart) and `k3d image import` still printed
 "Successfully imported"; `make import` now refuses to run when the cluster is not running.
 
+**Verified on the Mac (2026-11-17), after the fix:** all 13 child Applications Synced/Healthy;
+`make smoke` all PASS: 10 devices, newest reading 4 s old through the gateway, 401 without or with a
+wrong key, burst of 30 with the demo key → 20 × 200 and 10 × 429, admin key unaffected.
+**Phase 2 acceptance met.**
+
 **Open questions / assumptions**
 
 - GHCR packages are private on first publish: make the three packages public (once), or use
