@@ -152,9 +152,9 @@ Every task is implemented by an AI coding agent from this plan, reviewed by Andr
 
 ### Phase 4 — Incident lab & public exposure (Sat 21 – Sun 22 Nov)
 
-- [ ] 4.1 Incident framework: `make break-<name>` / `make restore-<name>`. Faults are injected either as live drift (with Argo CD self-heal paused for that app) or as a bad commit on a branch; recovery always goes through Git/Argo CD.
-- [ ] 4.2 **Scenario:** `dns` (bridge pointed at a wrong Kafka hostname). *(`cert` cut, see §6)*
-- [ ] 4.3 For each scenario: runbook in `docs/runbooks/` (symptom → alert → diagnosis commands → root cause → fix) and a short postmortem in `docs/postmortems/`.
+- [x] 4.1 Incident framework: `make break-<name>` / `make restore-<name>`. Faults are injected either as live drift (with Argo CD self-heal paused for that app) or as a bad commit on a branch; recovery always goes through Git/Argo CD.
+- [x] 4.2 **Scenario:** `dns` (bridge pointed at a wrong Kafka hostname). *(`cert` cut, see §6)*
+- [ ] 4.3 For each scenario: runbook in `docs/runbooks/` (symptom → alert → diagnosis commands → root cause → fix) and a short postmortem in `docs/postmortems/`. *(runbook done; postmortem written from the first run on the Mac)*
 - [ ] 4.4 Public hostnames on the existing tunnel (Cloudflare dashboard) → `https://127.0.0.1:8443` (Envoy Gateway; origin server name = hostname): `status.<domain>` (shared read-only Grafana dashboard) and `api.<domain>` (API docs + demo key with tight rate limit). Tunnel config documented in `docs/exposure.md`; Argo CD stays local only.
 - **Acceptance:** both scenarios reproducible end to end; public URLs work over HTTPS; Argo CD and every other hostname not reachable from outside.
 
