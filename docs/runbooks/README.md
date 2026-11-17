@@ -11,3 +11,7 @@ alert has no runbook.
 | `CertificateExpiringSoon` | [CertificateExpiringSoon.md](CertificateExpiringSoon.md) |
 | `PodCrashLooping` | [PodCrashLooping.md](PodCrashLooping.md) |
 | `TargetDown` | [TargetDown.md](TargetDown.md) |
+
+| Incident scenario | Runbook |
+|---|---|
+| `dns` (`make break-dns`) | [incident-dns.md](incident-dns.md) |
