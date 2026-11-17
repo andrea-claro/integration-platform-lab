@@ -1,0 +1,86 @@
+# One node with both KRaft roles (controller + broker): enough for a laptop lab.
+# Replication factor 1 everywhere, so there is no redundancy: a broker restart
+# pauses producers (the bridge stops acknowledging MQTT and back-pressures) and
+# consumers, but loses nothing that was acknowledged (persistent volume).
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaNodePool
+metadata:
+  name: dual-role
+  labels:
+    strimzi.io/cluster: ipl
+spec:
+  replicas: 1
+  roles:
+    - controller
+    - broker
+  storage:
+    type: jbod
+    volumes:
+      - id: 0
+        type: persistent-claim   # k3s local-path StorageClass
+        size: 2Gi
+        kraftMetadata: shared
+        deleteClaim: false
+  # PLAN §7: Kafka broker ~1 GiB. Fixed heap, the rest is page cache and metaspace.
+  jvmOptions:
+    -Xms: 384m
+    -Xmx: 384m
+  resources:
+    requests: {cpu: 200m, memory: 768Mi}
+    limits: {memory: 1Gi}
+---
+apiVersion: kafka.strimzi.io/v1
+kind: Kafka
+metadata:
+  name: ipl
+spec:
+  kafka:
+    version: 4.3.2
+    metadataVersion: 4.3-IV0
+    listeners:
+      # Cluster-internal plaintext listener, bootstrap ipl-kafka-bootstrap.streaming:9092.
+      # Who may connect is enforced by the NetworkPolicy that Strimzi generates
+      # from networkPolicyPeers: only the bridge (producer) and the telemetry API
+      # (consumer). Client TLS and authentication are a planned hardening step.
+      - name: plain
+        port: 9092
+        type: internal
+        tls: false
+        networkPolicyPeers:
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: iot
+            podSelector:
+              matchLabels:
+                app.kubernetes.io/name: mqtt-kafka-bridge
+          - namespaceSelector:
+              matchLabels:
+                kubernetes.io/metadata.name: apps
+            podSelector:
+              matchLabels:
+                app.kubernetes.io/name: telemetry-api
+    config:
+      # Single node: every internal topic has one replica.
+      offsets.topic.replication.factor: 1
+      transaction.state.log.replication.factor: 1
+      transaction.state.log.min.isr: 1
+      share.coordinator.state.topic.replication.factor: 1
+      share.coordinator.state.topic.min.isr: 1
+      default.replication.factor: 1
+      min.insync.replicas: 1
+      # Topics are declared as KafkaTopic resources, never created on first use.
+      auto.create.topics.enable: false
+  entityOperator:
+    # Topic Operator only: reconciles the KafkaTopic resources below.
+    # No User Operator, because clients do not authenticate yet.
+    topicOperator:
+      resources:
+        requests: {cpu: 50m, memory: 192Mi}
+        limits: {memory: 384Mi}
+  # Consumer lag and topic offsets for Prometheus (Phase 3 alerts on lag).
+  kafkaExporter:
+    topicRegex: "telemetry\\..*"
+    groupRegex: ".*"
+    resources:
+      requests: {cpu: 20m, memory: 32Mi}
+      limits: {memory: 128Mi}

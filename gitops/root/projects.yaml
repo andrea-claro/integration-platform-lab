@@ -7,8 +7,9 @@
 #   namespace, from this repository only; they cannot create cluster-scoped
 #   resources or change the guardrails of their namespace.
 #
-# Chart repositories and cluster resources needed by Strimzi (streaming) and
-# kube-prometheus-stack (observability) are added in Phases 2 and 3.
+# Operators that ship CRDs or cluster RBAC (Strimzi in Phase 2,
+# kube-prometheus-stack in Phase 3) are installed through the platform project
+# into their domain namespace; the domain projects only hold their own resources.
 # The root Application stays in the "default" project (created by infra/bootstrap).
 apiVersion: argoproj.io/v1alpha1
 kind: AppProject
@@ -24,6 +25,7 @@ spec:
     - https://charts.jetstack.io
     - https://bitnami.github.io/sealed-secrets
     - oci://registry-1.docker.io/envoyproxy/*
+    - oci://quay.io/strimzi-helm/*
   destinations:
     - server: https://kubernetes.default.svc
       namespace: platform
@@ -37,7 +39,7 @@ spec:
     - server: https://kubernetes.default.svc
       namespace: observability
   # Cluster-scoped kinds actually rendered by our manifests and the pinned charts
-  # (cert-manager, Envoy Gateway, Sealed Secrets). Anything else is refused.
+  # (cert-manager, Envoy Gateway, Sealed Secrets, Strimzi). Anything else is refused.
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace

@@ -1,0 +1,139 @@
+# Allow rules for "streaming": Strimzi cluster operator, Kafka cluster "ipl",
+# entity operator (Topic Operator) and Kafka Exporter.
+#
+# Ingress to the Kafka pods is not defined here. The operator generates the
+# NetworkPolicy "ipl-network-policy-kafka" from the Kafka resource: 9090
+# (KRaft control plane) and 9091 (replication) for Strimzi's own components,
+# 8443 for the operator, 9092 only for the listener's networkPolicyPeers
+# (the bridge in iot, the telemetry API in apps). The rules below open the
+# matching egress, which the default deny would otherwise block.
+#
+# Pod labels as set by Strimzi 1.3: Kafka pods strimzi.io/name=ipl-kafka,
+# entity operator ipl-entity-operator, exporter ipl-kafka-exporter,
+# operator strimzi.io/kind=cluster-operator.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-strimzi-operator-egress
+spec:
+  podSelector:
+    matchLabels:
+      strimzi.io/kind: cluster-operator
+  policyTypes:
+    - Egress
+  egress:
+    # Why: the operator watches Strimzi resources and manages pods, Secrets,
+    # Services and the generated NetworkPolicy through the Kubernetes API.
+    # k3s DNATs kubernetes.default (10.43.0.1:443) to the node IP on 6443 (see
+    # namespaces/platform).
+    - to:
+        - ipBlock:
+            cidr: 172.16.0.0/12
+        - ipBlock:
+            cidr: 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 6443
+    - to:
+        - ipBlock:
+            cidr: 10.43.0.1/32
+      ports:
+        - protocol: TCP
+          port: 443
+    # Why: admin calls to the brokers and controllers (rolling updates,
+    # configuration, KRaft quorum checks) and the Kafka agent (broker state).
+    - to:
+        - podSelector:
+            matchLabels:
+              strimzi.io/cluster: ipl
+              strimzi.io/name: ipl-kafka
+      ports:
+        - protocol: TCP
+          port: 9090
+        - protocol: TCP
+          port: 9091
+        - protocol: TCP
+          port: 8443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kafka-egress
+spec:
+  podSelector:
+    matchLabels:
+      strimzi.io/cluster: ipl
+      strimzi.io/name: ipl-kafka
+  policyTypes:
+    - Egress
+  egress:
+    # Why: KRaft quorum (9090) and broker replication/registration (9091)
+    # between Kafka nodes. With one dual-role node this is the pod talking to
+    # itself through its own Service name, which still crosses the policy.
+    - to:
+        - podSelector:
+            matchLabels:
+              strimzi.io/cluster: ipl
+              strimzi.io/name: ipl-kafka
+      ports:
+        - protocol: TCP
+          port: 9090
+        - protocol: TCP
+          port: 9091
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-entity-operator-egress
+spec:
+  podSelector:
+    matchLabels:
+      strimzi.io/name: ipl-entity-operator
+  policyTypes:
+    - Egress
+  egress:
+    # Why: the Topic Operator watches KafkaTopic resources and writes their status.
+    - to:
+        - ipBlock:
+            cidr: 172.16.0.0/12
+        - ipBlock:
+            cidr: 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 6443
+    - to:
+        - ipBlock:
+            cidr: 10.43.0.1/32
+      ports:
+        - protocol: TCP
+          port: 443
+    # Why: it creates and alters the topics through the replication listener (TLS).
+    - to:
+        - podSelector:
+            matchLabels:
+              strimzi.io/cluster: ipl
+              strimzi.io/name: ipl-kafka
+      ports:
+        - protocol: TCP
+          port: 9091
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kafka-exporter-egress
+spec:
+  podSelector:
+    matchLabels:
+      strimzi.io/name: ipl-kafka-exporter
+  policyTypes:
+    - Egress
+  egress:
+    # Why: reads topic offsets and consumer-group lag from the brokers (TLS).
+    - to:
+        - podSelector:
+            matchLabels:
+              strimzi.io/cluster: ipl
+              strimzi.io/name: ipl-kafka
+      ports:
+        - protocol: TCP
+          port: 9091
