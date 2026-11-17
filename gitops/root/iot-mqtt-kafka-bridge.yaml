@@ -1,0 +1,33 @@
+# MQTT -> Kafka bridge (iot domain). Stays unready until both Mosquitto and Kafka answer.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: iot-mqtt-kafka-bridge
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: integration-platform-lab
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: iot
+  source:
+    repoURL: https://github.com/andrea-claro/integration-platform-lab.git
+    targetRevision: main
+    path: gitops/iot/mqtt-kafka-bridge
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: iot
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - SkipDryRunOnMissingResource=true   # SealedSecret CRD from the platform project
+    retry:
+      limit: 10
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m

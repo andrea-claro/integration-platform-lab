@@ -1,0 +1,71 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mqtt-kafka-bridge
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mqtt-kafka-bridge
+spec:
+  # Exactly one: the bridge uses a fixed MQTT client id with a persistent
+  # session, so the broker queues messages for it while it is down and only
+  # forgets them once Kafka has accepted them (at-least-once). A second pod
+  # with the same client id would take the session over.
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {}
+  template:
+    spec:
+      serviceAccountName: mqtt-kafka-bridge
+      automountServiceAccountToken: false
+      # Time to flush in-flight Kafka deliveries before exit.
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: mqtt-kafka-bridge
+          image: ghcr.io/andrea-claro/ipl-mqtt-kafka-bridge:0.1.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: MQTT_HOST, value: mosquitto.iot.svc.cluster.local}
+            - {name: MQTT_PORT, value: "1883"}
+            - {name: MQTT_SUBSCRIBE_TOPIC, value: devices/+/telemetry}
+            # Strimzi bootstrap Service of Kafka cluster "ipl" (plain listener).
+            - {name: KAFKA_BOOTSTRAP_SERVERS, value: ipl-kafka-bootstrap.streaming.svc.cluster.local:9092}
+            - {name: KAFKA_TOPIC, value: telemetry.raw}
+            - {name: KAFKA_DLQ_TOPIC, value: telemetry.dlq}
+            - {name: HTTP_PORT, value: "8080"}
+            - {name: LOG_LEVEL, value: INFO}
+          # MQTT_USERNAME / MQTT_PASSWORD
+          envFrom:
+            - secretRef:
+                name: mqtt-kafka-bridge-mqtt
+          ports:
+            - name: http      # /healthz, /readyz, /metrics
+              containerPort: 8080
+          # Ready only while both MQTT and Kafka are reachable: a wrong Kafka
+          # hostname (incident "dns") shows up as an unready bridge.
+          readinessProbe:
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          # PLAN §7: our three services ~384 MiB together (idle RSS ~40 MiB).
+          resources:
+            requests: {cpu: 20m, memory: 64Mi}
+            limits: {memory: 192Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
