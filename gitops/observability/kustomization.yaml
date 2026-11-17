@@ -1,0 +1,22 @@
+# Observability configuration (PLAN 3.2-3.5), Application observability-config,
+# project observability. The stack itself is gitops/root/kube-prometheus-stack.yaml.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: observability
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: integration-platform-lab
+      app.kubernetes.io/component: observability
+resources:
+  - secrets/sealedsecret-grafana-admin.yaml
+  - monitors.yaml
+  - rules/integration-platform.yaml
+# Dashboards as code: the Grafana sidecar loads every ConfigMap labelled
+# grafana_dashboard=1 in this namespace.
+configMapGenerator:
+  - name: dashboard-integration-platform-overview
+    files:
+      - dashboards/integration-platform-overview.json
+    options:
+      labels:
+        grafana_dashboard: "1"

@@ -1,0 +1,54 @@
+# What Prometheus scrapes (PLAN 3.2). Kept in "observability": Prometheus only
+# selects monitors from this namespace, so domain projects cannot add targets.
+# The chart adds its own monitors for Prometheus, Alertmanager, Grafana, the
+# operator and kube-state-metrics.
+#
+# Our three services: /metrics on the "http" container port.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: services
+spec:
+  jobLabel: app.kubernetes.io/name     # job = service name
+  namespaceSelector:
+    matchNames: [iot, apps]
+  selector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values: [device-simulator, mqtt-kafka-bridge, telemetry-api]
+  podMetricsEndpoints:
+    - port: http
+      path: /metrics
+---
+# Kafka Exporter (Strimzi): topic offsets and consumer-group lag.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: kafka-exporter
+spec:
+  namespaceSelector:
+    matchNames: [streaming]
+  selector:
+    matchLabels:
+      strimzi.io/cluster: ipl
+      strimzi.io/name: ipl-kafka-exporter
+  podMetricsEndpoints:
+    - port: tcp-prometheus
+      path: /metrics
+---
+# cert-manager controller: certificate expiry and readiness.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: cert-manager
+spec:
+  namespaceSelector:
+    matchNames: [platform]
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cert-manager
+      app.kubernetes.io/component: controller
+  podMetricsEndpoints:
+    - port: http-metrics
+      path: /metrics
