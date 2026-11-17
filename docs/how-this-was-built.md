@@ -239,6 +239,14 @@ than rewritten. Lesson: push the branch after every commit, even before the PR i
 Not verifiable in the sandbox: pods running, NetworkPolicy enforcement, Argo CD project checks at
 sync time, the GHCR publish. These are covered by `make smoke` on the Mac.
 
+**Found during verification on the Mac (2026-11-17):** the Kafka pod crash-looped with
+`Failed to retrieve Secret ipl-dual-role-0`. Strimzi brokers read their own configuration Secret
+through the Kubernetes API at startup (`KubernetesSecretConfigProvider`), and the guardrails gave
+API egress only to the operator and the Topic Operator. Fixed by an API egress rule for the Kafka
+pod. The sandbox dry-run could not catch it, because NetworkPolicies are enforced only where pods
+run. Also: the k3d cluster had stopped (Docker restart) and `k3d image import` still printed
+"Successfully imported"; `make import` now refuses to run when the cluster is not running.
+
 **Open questions / assumptions**
 
 - GHCR packages are private on first publish: make the three packages public (once), or use
