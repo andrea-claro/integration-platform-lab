@@ -1,7 +1,21 @@
 # incidents
 
-Incident lab (Phase 4). One folder per scenario with `inject.sh`, `restore.sh` and a README;
-`make break-<name>` / `make restore-<name>` call them. Recovery always goes through Git and Argo CD.
+Incident lab (PLAN 4). One folder per scenario with `inject.sh` and `restore.sh`; `make incidents`
+lists them, `make break-<name>` / `make restore-<name>` run them. Shared helpers: `lib.sh`.
 
-MVP scenarios: `cert` (gateway certificate expiring/expired), `dns` (bridge pointed at a wrong
-Kafka hostname). Later: `netpol`, `oom`.
+Rules of the lab:
+
+- Faults are **live drift** on a resource Argo CD manages. Self-heal is paused for that application
+  (and for `root`, which would otherwise restore the application's sync policy from Git). This is
+  the only place where manual changes to the cluster are allowed (CLAUDE.md).
+- **Recovery always goes through GitOps.** `restore.sh` resumes self-heal and Argo CD puts the Git
+  state back. Nothing is fixed by hand.
+- `restore.sh` prints a timeline (injected, alert fired, restore, recovered) for the postmortem.
+
+| Scenario | Fault | Detected by | Runbook | Postmortem |
+|---|---|---|---|---|
+| `dns` | bridge points at a Kafka hostname in a namespace that does not exist | `TelemetryPipelineStalled` | [incident-dns.md](../docs/runbooks/incident-dns.md) | [docs/postmortems](../docs/postmortems/) |
+
+Cut for time (PLAN §6), natural next ones: `cert` (gateway certificate expiring), `netpol` (missing
+allow rule), `oom` (memory limit too low). The Phase 2 Kafka crash loop is a real `netpol` case,
+written up in [PodCrashLooping](../docs/runbooks/PodCrashLooping.md).
