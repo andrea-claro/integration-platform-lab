@@ -26,7 +26,16 @@ options:
   k3s:
     extraArgs:
       # Gateway API with Envoy Gateway replaces the bundled Traefik (ADR-002).
-      - arg: --disable=traefik
+      # metrics-server is not used (Prometheus + kube-state-metrics are); its
+      # aggregated API only slows the API server's readiness after a restart.
+      - arg: --disable=traefik,metrics-server
+        nodeFilters:
+          - server:*
+      # Embedded etcd instead of the default SQLite (kine) datastore. With a dozen
+      # controllers and operators renewing leases and Argo CD reconciling large
+      # CRDs, SQLite timed out and k3s exited ("Transaction commit failed: sql:
+      # transaction has already been committed or rolled back").
+      - arg: --cluster-init
         nodeFilters:
           - server:*
   kubeconfig:
