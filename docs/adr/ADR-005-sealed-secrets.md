@@ -6,7 +6,7 @@
 ## Context
 
 Everything in the cluster comes from Git through Argo CD, and the repository is public.
-Secrets (Telegram bot token, API keys, Grafana and MQTT passwords) must therefore be stored in
+Secrets (API keys, Grafana and MQTT passwords) must therefore be stored in
 Git in a form that is useless without a key that never leaves the cluster.
 
 The project rules exclude Bitnami charts and images, because Bitnami discontinued its free

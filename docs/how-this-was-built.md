@@ -247,12 +247,58 @@ pod. The sandbox dry-run could not catch it, because NetworkPolicies are enforce
 run. Also: the k3d cluster had stopped (Docker restart) and `k3d image import` still printed
 "Successfully imported"; `make import` now refuses to run when the cluster is not running.
 
+**Verified on the Mac (2026-11-17), after the fix:** all 13 child Applications Synced/Healthy;
+`make smoke` all PASS: 10 devices, newest reading 4 s old through the gateway, 401 without or with a
+wrong key, burst of 30 with the demo key → 20 × 200 and 10 × 429, admin key unaffected.
+**Phase 2 acceptance met.**
+
 **Open questions / assumptions**
 
 - GHCR packages are private on first publish: make the three packages public (once), or use
   `make import`.
 - Plain MQTT and Kafka inside the cluster (NetworkPolicies + authentication on MQTT); TLS and Kafka
   client authentication are later hardening steps.
+
+**Human review:** _to be filled in by Andrea_
+
+---
+
+## 2026-11-17 — Phase 3 (lean): observability
+
+**Tasks:** 3.1–3.5. Scope reduced the same evening at Andrea's request ("reach the end of the lab
+sooner, still showing the point"): see PLAN §6, scope update. Plan approved in the same exchange.
+
+**Produced**
+
+- `kube-prometheus-stack` 93.3.1 (Prometheus Operator v0.95.2, Prometheus v3.16, Grafana 13.3)
+  through the `platform` project: no node-exporter, no k3s control-plane monitors, no default rules
+  or dashboards, admission webhooks off (rules are checked by promtool), ~650 MiB requested.
+  Prometheus selects monitors and rules from `observability` only.
+- `observability-config` (project `observability`): PodMonitors for the three services, Kafka
+  Exporter and cert-manager; five alerts; the "Integration Platform overview" dashboard as a
+  ConfigMap; the existing Grafana admin SealedSecret.
+- Alerts, symptom first: `TelemetryPipelineStalled` (also fires when the bridge is not scraped at
+  all), `KafkaConsumerLagHigh`, `CertificateExpiringSoon`, `PodCrashLooping`, `TargetDown`. Each has
+  a runbook and promtool tests that fire and do not fire. `PodCrashLooping`'s runbook uses the
+  real Kafka crash loop found during the Phase 2 verification as its example.
+- `scripts/test-rules.sh` (`make test-rules`, also in `make lint`): extracts the rule groups from the
+  PrometheusRule manifests, runs `promtool check` and `test`, fails if an alert has no runbook.
+  promtool added to the toolbox image.
+- NetworkPolicies for `observability`; the namespace now enforces the `baseline` Pod Security
+  Standard (node-exporter was the only reason for `privileged`).
+- Telegram removed everywhere (SealedSecret, `.env.example`, seal script): cut from scope.
+- `tests/smoke/phase3-observability.sh`; `make grafana-ui`, `make prometheus-ui`, `make alertmanager-ui`.
+
+**Verified (agent sandbox)**
+
+- promtool: 5 rules, all tests pass. Mutation check: weakening a threshold or dropping the
+  `or vector(0)` branch makes the matching test fail, so the tests do bite.
+- `scripts/lint.sh` green (yamllint caught two over-long lines; PromQL folded).
+- k3s v1.35.10 API server with the chart CRDs: root Applications, `gitops/observability` and the
+  rendered chart (36 objects) accepted in server-side dry-run; Grafana, kube-state-metrics and
+  operator pods admitted at `baseline` with no `restricted` warnings, within quota and LimitRange.
+
+Not verifiable in the sandbox: scraping through the NetworkPolicies, Grafana loading the dashboard.
 
 **Human review:** _to be filled in by Andrea_
 

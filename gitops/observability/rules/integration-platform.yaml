@@ -1,0 +1,75 @@
+# Alert rules (PLAN 3.4). Symptom first: one alert says "data stopped flowing",
+# the others point at the usual causes. Every alert has a runbook and a
+# promtool unit test (tests/promtool, `make test-rules`).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: integration-platform
+spec:
+  groups:
+    - name: integration-platform
+      rules:
+        - alert: TelemetryPipelineStalled
+          # No record acknowledged by Kafka in the last 2 minutes, including the
+          # case where the bridge is not scraped at all (or vector(0)).
+          expr: (sum(rate(bridge_kafka_messages_produced_total[2m])) or vector(0)) == 0
+          for: 3m
+          labels:
+            severity: critical
+          annotations:
+            summary: No telemetry is reaching Kafka
+            description: >-
+              The MQTT-Kafka bridge has not delivered any record to telemetry.raw for
+              at least 3 minutes, so the API serves stale readings.
+            runbook_url: https://github.com/andrea-claro/integration-platform-lab/blob/main/docs/runbooks/TelemetryPipelineStalled.md
+
+        - alert: KafkaConsumerLagHigh
+          expr: sum by (consumergroup, topic) (kafka_consumergroup_lag{consumergroup="telemetry-api"}) > 500
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Consumer group {{ $labels.consumergroup }} is falling behind on {{ $labels.topic }}"
+            description: >-
+              {{ $value }} records are waiting to be consumed (about 2 records/s are
+              produced), so the API is minutes behind the devices.
+            runbook_url: https://github.com/andrea-claro/integration-platform-lab/blob/main/docs/runbooks/KafkaConsumerLagHigh.md
+
+        - alert: CertificateExpiringSoon
+          # cert-manager renews 30 days before expiry: below 21 days, renewal is
+          # failing.
+          expr: (certmanager_certificate_expiration_timestamp_seconds - time()) < 21 * 24 * 3600
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Certificate {{ $labels.namespace }}/{{ $labels.name }} expires in less than 21 days"
+            description: >-
+              It expires in {{ $value | humanizeDuration }} and should have been
+              renewed already.
+            runbook_url: https://github.com/andrea-claro/integration-platform-lab/blob/main/docs/runbooks/CertificateExpiringSoon.md
+
+        - alert: PodCrashLooping
+          expr: >-
+            max by (namespace, pod, container) (
+              max_over_time(kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"}[5m])
+            ) >= 1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.namespace }}/{{ $labels.pod }} ({{ $labels.container }}) is crash looping"
+            description: The container keeps restarting and is in CrashLoopBackOff.
+            runbook_url: https://github.com/andrea-claro/integration-platform-lab/blob/main/docs/runbooks/PodCrashLooping.md
+
+        - alert: TargetDown
+          expr: up == 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Prometheus cannot scrape {{ $labels.job }} ({{ $labels.namespace }}/{{ $labels.pod }})"
+            description: >-
+              The target has been down for 5 minutes: the workload is not running,
+              or a NetworkPolicy blocks the scrape.
+            runbook_url: https://github.com/andrea-claro/integration-platform-lab/blob/main/docs/runbooks/TargetDown.md

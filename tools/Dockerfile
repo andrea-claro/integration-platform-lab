@@ -3,6 +3,8 @@
 FROM ghcr.io/yannh/kubeconform:v0.8.0 AS kubeconform
 FROM registry.k8s.io/kustomize/kustomize:v5.8.3 AS kustomize
 FROM ghcr.io/opentofu/opentofu:1.13.9-minimal AS tofu
+# Same Prometheus version as kube-prometheus-stack 93.3.1.
+FROM quay.io/prometheus/prometheus:v3.16.0 AS prometheus
 
 FROM python:3.12.16-slim-trixie
 
@@ -18,6 +20,7 @@ RUN pip install --no-cache-dir \
 COPY --from=kubeconform /kubeconform /usr/local/bin/kubeconform
 COPY --from=kustomize /app/kustomize /usr/local/bin/kustomize
 COPY --from=tofu /usr/local/bin/tofu /usr/local/bin/tofu
+COPY --from=prometheus /bin/promtool /usr/local/bin/promtool
 
 # The repository is bind-mounted here and may be owned by another uid.
 RUN git config --system --add safe.directory /work

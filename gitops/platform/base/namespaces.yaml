@@ -3,8 +3,8 @@
 #
 # Pod Security Admission: enforce "baseline" everywhere, warn/audit on
 # "restricted" so violations show up before we tighten enforcement.
-# observability enforces "privileged" because node-exporter needs hostNetwork,
-# hostPID and hostPath mounts (revisit in Phase 3: drop node-exporter or keep it).
+# (observability enforced "privileged" for node-exporter until Phase 3, which
+# dropped node-exporter.)
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -50,6 +50,6 @@ metadata:
   labels:
     # May attach routes to the shared Gateway (platform/public).
     gateway-access: "true"
-    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/enforce: baseline
     pod-security.kubernetes.io/warn: restricted
     pod-security.kubernetes.io/audit: restricted

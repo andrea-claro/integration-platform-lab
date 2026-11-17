@@ -32,6 +32,9 @@ find gitops -name kustomization.yaml -print0 | sort -z | while IFS= read -r -d '
     -schema-location default -schema-location "$CRD_SCHEMAS"
 done
 
+step "promtool: alert rule unit tests and runbooks"
+scripts/test-rules.sh
+
 step "tofu fmt + validate (infra/bootstrap)"
 tofu fmt -check -recursive infra
 tofu -chdir=infra/bootstrap init -backend=false -input=false >/dev/null

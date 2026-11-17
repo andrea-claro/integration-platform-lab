@@ -1,4 +1,5 @@
-# PLAN §7: Prometheus ~1 GiB, Grafana + Alertmanager ~384 MiB, operator and exporters.
+# PLAN §7: Prometheus ~1 GiB, Grafana + Alertmanager ~384 MiB, operator and exporters
+# (the lean stack requests ~650 MiB in total).
 apiVersion: v1
 kind: ResourceQuota
 metadata:

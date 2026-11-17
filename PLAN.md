@@ -48,7 +48,7 @@ What the project must prove to a reviewer:
           │ consumes
    Kafka (Strimzi, KRaft, 1 broker) ◄── mqtt-kafka-bridge ◄── Mosquitto (MQTT) ◄── device-simulator
 
-   Observability: kube-prometheus-stack (Prometheus, Alertmanager → Telegram, Grafana)
+   Observability: kube-prometheus-stack (Prometheus, Alertmanager, Grafana)
    Security: namespaces per domain · RBAC + Argo CD AppProjects · default-deny NetworkPolicies
              · ResourceQuota/LimitRange · one ServiceAccount per workload · Sealed Secrets
    Delivery: Terraform/OpenTofu bootstrap → Argo CD app-of-apps → Helm (3rd party) + Kustomize (own)
@@ -87,7 +87,7 @@ integration-platform-portfolio/
 ├── CLAUDE.md                instructions for coding agents
 ├── README.md
 ├── Makefile                 cluster, bootstrap, down, test, lint, break-*, status
-├── .env.example             tunnel token, Telegram bot, demo API key (never real values)
+├── .env.example             API keys, Grafana and MQTT passwords (never real values)
 ├── cluster/                 k3d config (Traefik disabled)
 ├── infra/
 │   ├── bootstrap/           Terraform/OpenTofu: Argo CD (Helm provider) + root Application
@@ -138,35 +138,35 @@ Every task is implemented by an AI coding agent from this plan, reviewed by Andr
 - [x] 2.5 `telemetry-api` (FastAPI): consumes Kafka, serves latest readings and per-device stats; OpenAPI docs.
 - [x] 2.6 HTTPRoute for the API with local rate limiting and API-key auth (Envoy Gateway policies).
 - [x] 2.7 Images built and pushed to GHCR by CI; locally `k3d image import` for fast iteration. *(first publish when the workflow runs on `main`)*
-- **Acceptance:** simulator → MQTT → Kafka → API returns fresh readings over HTTPS; no key → 401; burst above the limit → 429; unit tests green. *(scripted in `tests/smoke/phase2-integration.sh`; to be confirmed on the Mac)*
+- **Acceptance:** simulator → MQTT → Kafka → API returns fresh readings over HTTPS; no key → 401; burst above the limit → 429; unit tests green. *(met: `make smoke` all PASS on the Mac, 17 Nov)*
 
 ### Phase 3 — Observability (Fri 20 Nov)
 
-- [ ] 3.1 kube-prometheus-stack with short retention and small resource requests.
-- [ ] 3.2 ServiceMonitors/PodMonitors: Kafka Exporter, Envoy, cert-manager, our services (`/metrics`).
-- [ ] 3.3 Grafana dashboard as code: "Integration Platform overview" (throughput, consumer lag, gateway latency/5xx, cert expiry, pod health).
-- [ ] 3.4 PrometheusRules: `KafkaConsumerLagHigh`, `PodCrashLooping`, `CertificateExpiringSoon`, `GatewayHigh5xxRate`, `TargetDown`.
-- [ ] 3.5 `promtool test rules` unit tests for every alert.
-- [ ] 3.6 Alertmanager → Telegram (bot token as SealedSecret).
-- **Acceptance:** every rule has a passing promtool test; a real alert reaches Telegram.
+- [x] 3.1 kube-prometheus-stack with short retention and small resource requests.
+- [x] 3.2 ServiceMonitors/PodMonitors: Kafka Exporter, cert-manager, our services (`/metrics`), kube-state-metrics. *(Envoy cut, see §6)*
+- [x] 3.3 Grafana dashboard as code: "Integration Platform overview" (throughput, consumer lag, API latency/errors, cert expiry, pod health).
+- [x] 3.4 PrometheusRules: `TelemetryPipelineStalled`, `KafkaConsumerLagHigh`, `PodCrashLooping`, `CertificateExpiringSoon`, `TargetDown`.
+- [x] 3.5 `promtool test rules` unit tests for every alert.
+- ~~3.6 Alertmanager → Telegram (bot token as SealedSecret).~~ *(cut, see §6: alerts in the Alertmanager UI)*
+- **Acceptance:** every rule has a passing promtool test; every target is up; alerts reach Alertmanager. *(scripted in `tests/smoke/phase3-observability.sh`; to be confirmed on the Mac)*
 
 ### Phase 4 — Incident lab & public exposure (Sat 21 – Sun 22 Nov)
 
 - [ ] 4.1 Incident framework: `make break-<name>` / `make restore-<name>`. Faults are injected either as live drift (with Argo CD self-heal paused for that app) or as a bad commit on a branch; recovery always goes through Git/Argo CD.
-- [ ] 4.2 **MVP scenarios:** `cert` (certificate expiring / expired on the gateway) and `dns` (bridge pointed at a wrong Kafka hostname).
+- [ ] 4.2 **Scenario:** `dns` (bridge pointed at a wrong Kafka hostname). *(`cert` cut, see §6)*
 - [ ] 4.3 For each scenario: runbook in `docs/runbooks/` (symptom → alert → diagnosis commands → root cause → fix) and a short postmortem in `docs/postmortems/`.
 - [ ] 4.4 Public hostnames on the existing tunnel (Cloudflare dashboard) → `https://127.0.0.1:8443` (Envoy Gateway; origin server name = hostname): `status.<domain>` (shared read-only Grafana dashboard) and `api.<domain>` (API docs + demo key with tight rate limit). Tunnel config documented in `docs/exposure.md`; Argo CD stays local only.
 - **Acceptance:** both scenarios reproducible end to end; public URLs work over HTTPS; Argo CD and every other hostname not reachable from outside.
 
 ### Phase 5 — CI, docs, polish (Sun 22 – Mon 23 Nov)
 
-- [ ] 5.1 GitHub Actions: yamllint, kubeconform on rendered manifests, `helm lint`/`template`, kube-linter, Trivy config scan, `promtool test rules`, ruff + pytest, `tofu`/`terraform fmt` + `validate`, image build → GHCR.
+- [ ] 5.1 GitHub Actions: yamllint, kubeconform on rendered manifests, `promtool test rules`, ruff + pytest, `tofu fmt` + `validate`, image build → GHCR. *(kube-linter, Trivy cut, see §6)*
 - [ ] 5.2 README: what it is, architecture diagram, local ↔ AWS table, quickstart, incident lab walkthrough, live links.
 - [ ] 5.3 `docs/how-this-was-built.md`: agent workflow, review checklist, examples of AI output corrected or rejected.
 - [ ] 5.4 ADR-001 to ADR-006.
 - **Acceptance:** CI green on `main`; a reviewer understands the platform and the incident lab in two minutes.
 
-### Phase 6 — Next steps (from Tue 24 Nov)
+### Phase 6 — Next steps (not scheduled: listed in the README)
 
 - [ ] 6.1 Client mTLS for the API (Envoy Gateway client certificate validation, certs from cert-manager).
 - [ ] 6.2 Scenarios `netpol` (missing allow rule) and `oom` (memory limit too low).
@@ -179,6 +179,13 @@ Every task is implemented by an AI coding agent from this plan, reviewed by Andr
 - **Must have by 23 Nov:** Phases 0–3, `status.<domain>` public, one incident scenario with runbook, README.
 - **Cut first, in this order:** API-key auth (keep rate limit), second incident scenario, Telegram (keep Alertmanager UI), kube-linter/Trivy in CI.
 - **Never cut:** GitOps as the only deployment path, default-deny NetworkPolicies, promtool tests, README "how this was built".
+
+**Scope update (17 Nov).** Phases 0–2 are done and verified. To reach a complete, reviewable lab
+sooner, the rest follows a lean path: what a reviewer needs to see is GitOps done properly, the
+security baseline and one incident diagnosed end to end. Cut: Envoy scraping and the gateway 5xx
+alert (the API's own metrics cover the dashboard; `TelemetryPipelineStalled` replaces the alert),
+node-exporter and the chart's default rules and dashboards, Telegram, the `cert` scenario,
+kube-linter and Trivy in CI. Phase 6 moves to the README as next steps.
 
 ## 7. Resource budget
 

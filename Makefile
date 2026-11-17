@@ -67,6 +67,17 @@ argocd-password: ## Print the initial Argo CD admin password
 argocd-ui: ## Argo CD UI on http://localhost:8080 (port-forward, local only)
 	kubectl --context $(KUBE_CONTEXT) -n argocd port-forward svc/argocd-server 8080:80
 
+# --- Observability UIs (port-forward, local only) ----------------------------
+.PHONY: grafana-ui prometheus-ui alertmanager-ui
+grafana-ui: ## Grafana on http://localhost:3000 (user admin, password GRAFANA_ADMIN_PASSWORD in .env)
+	kubectl --context $(KUBE_CONTEXT) -n observability port-forward svc/kps-grafana 3000:80
+
+prometheus-ui: ## Prometheus on http://localhost:9090 (targets, rules, alerts)
+	kubectl --context $(KUBE_CONTEXT) -n observability port-forward svc/kps-prometheus 9090:9090
+
+alertmanager-ui: ## Alertmanager on http://localhost:9093
+	kubectl --context $(KUBE_CONTEXT) -n observability port-forward svc/kps-alertmanager 9093:9093
+
 # --- Secrets -----------------------------------------------------------------
 .PHONY: seal seal-backup check-secrets
 seal: ## Seal secrets from .env into SealedSecret manifests (needs the controller)
@@ -101,12 +112,15 @@ cluster-running:
 	fi
 
 # --- Quality -----------------------------------------------------------------
-.PHONY: test lint toolbox smoke
+.PHONY: test test-rules lint toolbox smoke
 test: ## Unit tests + ruff for every service, inside Docker (test stage)
 	@set -e; for s in $(SERVICES); do \
 	  echo "==> $$s"; \
 	  docker build --target test --progress=plain -t ipl-test-$$s services/$$s; \
 	done
+
+test-rules: toolbox ## promtool unit tests for every alert rule, plus the runbook check
+	docker run --rm -u "$$(id -u):$$(id -g)" -v "$(CURDIR):/work" $(TOOLBOX) scripts/test-rules.sh
 
 smoke: ## Acceptance checks against the running cluster (tests/smoke)
 	@set -e; for t in tests/smoke/*.sh; do KUBE_CONTEXT=$(KUBE_CONTEXT) $$t; done
