@@ -109,10 +109,12 @@ spec:
               news_feed_enabled: false
             users:
               allow_sign_up: false
-          # PLAN §7: Grafana + Alertmanager ~384 MiB.
+          # PLAN §7: Grafana + Alertmanager ~384 MiB. Grafana 13 runs each bundled
+          # datasource plugin as its own process (a dozen gpx_* processes): 256 Mi
+          # was OOM-killed at startup on the Mac, so the limit leaves room for them.
           resources:
-            requests: {cpu: 20m, memory: 128Mi}
-            limits: {memory: 256Mi}
+            requests: {cpu: 20m, memory: 192Mi}
+            limits: {memory: 512Mi}
   destination:
     server: https://kubernetes.default.svc
     namespace: observability
