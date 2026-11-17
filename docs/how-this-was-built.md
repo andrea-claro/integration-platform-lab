@@ -175,3 +175,77 @@ cannot reach `apps`; `kubectl auth can-i` checks scripted in `tests/smoke`.
 **Human review:** _to be filled in by Andrea_
 
 ---
+
+## 2026-11-17 — Phase 2: integration workloads on the cluster
+
+**Tasks:** 2.1 Strimzi + Kafka · 2.2 Mosquitto · 2.3–2.5 the three services on Kubernetes ·
+2.6 API route with API-key auth and rate limits · 2.7 CI image publishing. Plan approved by Andrea
+on 2026-11-16 (CLAUDE.md: NetworkPolicies, secrets, exposure).
+
+**Recovered work.** The first Phase 2 session ended before anything was pushed. Its commands were
+still in the session transcript, so the finished parts (CI workflow, OpenAPI key scheme, Strimzi and
+Kafka manifests, NetworkPolicies) were replayed from it onto a fresh branch and re-validated rather
+than rewritten. Lesson: push the branch after every commit, even before the PR is ready.
+
+**Produced**
+
+- `.github/workflows/images.yaml`: per service, the `test` stage (ruff + pytest) and a runtime build
+  on every PR; on `main` a push to `ghcr.io/<owner>/ipl-<service>` tagged with the version from
+  `pyproject.toml` and `sha-<commit>`. Version tags are immutable; the job fails if `gitops/` pins a
+  different version, or if a PR changes an already published service without bumping it.
+  `make build`/`make import` use the same tags, so the cluster can run local builds first.
+- Strimzi 1.3.1 (OCI chart, `platform` project) and the `streaming-kafka` Application: Kafka 4.3.2
+  in KRaft mode, one dual-role node, topics `telemetry.raw`/`telemetry.dlq`, Topic Operator, Kafka
+  Exporter.
+- `iot`: Mosquitto 2.1.2 (one user per client, topic ACL, persistence on a 256 Mi volume),
+  device simulator and MQTT→Kafka bridge, one Application each.
+- `apps`: telemetry-api (replaces the echo service), HTTPRoutes for `/v1` and the public docs,
+  Envoy Gateway `SecurityPolicy` (API key from the existing SealedSecret) and
+  `BackendTrafficPolicy` (local rate limits: 20/min for the published demo key, 300/min otherwise).
+- NetworkPolicies for every new flow, each with a "why" comment; flow table in
+  `gitops/platform/guardrails/README.md`.
+- `tests/smoke/phase2-integration.sh`; the Phase 1 smoke tests now target the API.
+
+**Design notes**
+
+- Envoy Gateway v1.9.3 orders the API-key filter before the local rate limit
+  (`internal/xds/translator/httpfilters.go`), so the rate limit can select on the `x-client-id`
+  header the auth filter sets. Envoy overwrites that header, so a client cannot pick its own budget.
+- Mosquitto 2.1 warns, and announces it will refuse, when the password or ACL file is not owned by
+  the broker user (reproduced with the real image). Secret files are root-owned, so an init
+  container copies them as uid 1883, mode 0400, into an in-memory volume.
+- Simulator and bridge run as one replica with `Recreate`: fixed MQTT client ids and a persistent
+  session for the bridge (two pods would take the session from each other).
+- Kafka ingress comes from the NetworkPolicy Strimzi generates from `networkPolicyPeers`; the
+  guardrails only add the matching egress. Pod labels and ports checked in the Strimzi 1.3.1 source.
+- Secret volume modes are written in decimal (`288` = `0440`): a leading-zero octal can be read
+  as decimal by YAML 1.2 tooling.
+- Memory requests from measured idle RSS (simulator ~30 MiB, bridge ~40 MiB, API ~60 MiB):
+  48/64/96 MiB, 208 MiB in total against the 384 MiB of PLAN §7.
+
+**Verified (agent sandbox)**
+
+- Unit tests: 63 green (16 + 28 + 19), ruff clean (Python 3.13 venvs; `make test` and CI run them in
+  the images' Python 3.12 `test` stage).
+- `scripts/lint.sh` green with the same pinned tool versions as the toolbox image (the image itself
+  could not be built: Docker Hub rate limit). yamllint caught one over-long line in the workflow.
+- k3s v1.35.10 API server with the CRDs of every pinned chart: namespaces and guardrails applied for
+  real, then every manifest (root Applications and AppProjects, Kafka, iot, apps, gateway policies,
+  the rendered Strimzi chart) accepted in server-side dry-run. Pods built from every Deployment
+  template admitted by Pod Security (no `restricted` warnings), LimitRange and ResourceQuota.
+- Mosquitto config, password file and ACL tested with the real 2.1.2 image: publish/subscribe
+  allowed per ACL, wrong password refused, the simulator cannot read the topic, no ownership warnings.
+
+Not verifiable in the sandbox: pods running, NetworkPolicy enforcement, Argo CD project checks at
+sync time, the GHCR publish. These are covered by `make smoke` on the Mac.
+
+**Open questions / assumptions**
+
+- GHCR packages are private on first publish: make the three packages public (once), or use
+  `make import`.
+- Plain MQTT and Kafka inside the cluster (NetworkPolicies + authentication on MQTT); TLS and Kafka
+  client authentication are later hardening steps.
+
+**Human review:** _to be filled in by Andrea_
+
+---
