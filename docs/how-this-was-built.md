@@ -17,6 +17,13 @@ and a human review section.
 4. Andrea reviews and merges; Argo CD deploys; `make smoke` verifies the phase on the real cluster.
    What the sandbox cannot see (pods running, NetworkPolicy enforcement) is found there.
 
+**What "human review" meant in practice.** Andrea approved every plan that touched security
+(RBAC, NetworkPolicies, secrets, exposure), decided scope and trade-offs, ran the acceptance checks
+on the real cluster and reported what failed. He merged the pull requests; the substantive check
+was the smoke test on the cluster, not a line-by-line read of every change. The "Human review"
+notes in each entry were written by the agent from the session record, at Andrea's request, and
+approved by him in PR #12.
+
 ## Review checklist
 
 - Does it meet the acceptance criteria, and is there a test or smoke check that proves it?
@@ -114,7 +121,12 @@ DNS outage unrelated to the project.
   explicit public hostnames; inside the local cluster, pragmatic settings are acceptable. Current
   Pod Security levels are kept.
 
-**Human review:** _to be filled in by Andrea_
+**Human review (Andrea):** committed and pushed the Phase 0 files himself (at that stage the
+agent delivered files, not pull requests). Ran `make cluster && make bootstrap` and `make dev-up`
+on the Mac. The first `make dev-up` crash-looped all three services; he reported it, and the
+agent traced it to the mode 600 files. Fixed the local tooling problems that showed up (an old
+OpenTofu on PATH, the repository URL). Decided the exposure model, the public repository and the
+security posture recorded above.
 
 ---
 
@@ -157,7 +169,11 @@ ignored `gitops/observability/secrets/`, so two SealedSecrets were missing from 
 Anchored to `/secrets/`. Also: `mosquitto_passwd` warned about a world-readable temp file; the
 seal script now creates it with mode 600 (the in-cluster broker will mount it read-only, 0400).
 
-**Human review:** _to be filled in by Andrea_
+**Human review (Andrea):** approved the plan before implementation (exposure and secrets). After
+merging PR #1, ran the verification on the Mac: all Applications Healthy, `make smoke` 5/5, then
+`make env`, `make seal-backup` and `make seal`. The run surfaced the missing SealedSecrets
+(`.gitignore` rule) and the `mosquitto_passwd` permission warning, both fixed before PR #2 was
+merged.
 
 ---
 
@@ -209,7 +225,10 @@ refused the same way and must not pass for a policy block).
 **Phase 1 acceptance met:** echo over HTTPS through the gateway with the internal CA; a pod in `iot`
 cannot reach `apps`; `kubectl auth can-i` checks scripted in `tests/smoke`.
 
-**Human review:** _to be filled in by Andrea_
+**Human review (Andrea):** approved the plan before implementation (RBAC and NetworkPolicies).
+Merged PR #3, ran `make status` and `make smoke`, and sent back the one failure: the network probe
+reported "inconclusive" (curl exit 7). That led to the kube-router finding and PR #4, which he
+merged after `make smoke` passed.
 
 ---
 
@@ -296,7 +315,11 @@ wrong key, burst of 30 with the demo key → 20 × 200 and 10 × 429, admin key 
 - Plain MQTT and Kafka inside the cluster (NetworkPolicies + authentication on MQTT); TLS and Kafka
   client authentication are later hardening steps.
 
-**Human review:** _to be filled in by Andrea_
+**Human review (Andrea):** approved the Phase 2 plan on 2026-11-16 (NetworkPolicies, secrets,
+exposure). Merged PR #5 and ran it on the Mac. When the node container turned out to be stopped,
+restarted the cluster. Collected the Kafka logs, pod description and `Kafka` status the agent asked
+for, which pinned down the crash loop. Merged PR #6 (a NetworkPolicy change, so merging was the
+approval) and ran `make smoke`: all PASS.
 
 ---
 
@@ -337,7 +360,12 @@ sooner, still showing the point"): see PLAN §6, scope update. Plan approved in 
 
 Not verifiable in the sandbox: scraping through the NetworkPolicies, Grafana loading the dashboard.
 
-**Human review:** _to be filled in by Andrea_
+**Human review (Andrea):** asked whether a lab meant for reviewers needed every planned feature,
+and told the agent to cut the scope and finish sooner. The lean path in PLAN §6, dropping
+node-exporter and Telegram, follows from that. Merged PR #7. On the Mac the stack never reached the
+smoke test: the first run came before Argo CD had synced, then the cluster crashed. He collected
+the kernel log, `docker stats` and the k3s log on request, which separated the Grafana OOM from the
+datastore failure. Merged PR #10.
 
 ---
 
@@ -369,7 +397,8 @@ first run on the Mac, with real timings).
 **Verified (agent sandbox):** shellcheck (now also on `incidents/`), lint green. Running the
 scenario needs the cluster: next step on the Mac.
 
-**Human review:** _to be filled in by Andrea_
+**Human review (Andrea):** merged PR #8. The scenario was not run: the cluster went down before
+it could be (see the wrap-up entry).
 
 ---
 
@@ -388,7 +417,7 @@ scenario needs the cluster: next step on the Mac.
 
 **Verified (agent sandbox):** lint green; Mermaid diagram validated.
 
-**Human review:** _to be filled in by Andrea_
+**Human review (Andrea):** merged PR #9 after the `checks` workflow passed on it.
 
 ---
 
@@ -418,6 +447,8 @@ repository instead of keeping a live, publicly exposed cluster. See
 **Open:** rebuild on etcd and run `make smoke` for Phase 3 and `make break-dns` / `restore-dns`;
 a dead man's switch delivered outside the cluster.
 
-**Human review:** _to be filled in by Andrea_
+**Human review (Andrea):** decided to stop maintaining a live cluster and to share the lab as a
+repository. Asked the agent to make the repository complete for that (PR #11, merged) and to write
+these human-review notes from the session record (PR #12).
 
 ---
