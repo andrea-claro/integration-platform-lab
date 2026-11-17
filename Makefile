@@ -10,7 +10,8 @@ LINT_IN_DOCKER ?= 1
 
 GITHUB_OWNER := $(or $(shell sed -n 's/^GITHUB_OWNER=//p' .env 2>/dev/null),andrea-claro)
 IMAGE_PREFIX ?= ghcr.io/$(GITHUB_OWNER)/ipl-
-IMAGE_TAG    ?= dev
+# Empty = each service's version from its pyproject.toml, the tag pinned in gitops/.
+IMAGE_TAG    ?=
 SERVICES     := device-simulator mqtt-kafka-bridge telemetry-api
 TOOLBOX      := ipl-toolbox:local
 COMPOSE      := docker compose -f services/compose.yaml --project-name ipl-dev
@@ -78,15 +79,19 @@ check-secrets: ## Fail on plain Secret manifests or tracked .env files
 	@scripts/check-no-plain-secrets.sh
 
 # --- Images ------------------------------------------------------------------
+# CI publishes the same names to GHCR (.github/workflows/images.yaml). `make import`
+# loads local builds under the pinned tags, so the cluster can run them before the
+# GHCR packages exist or are public (imagePullPolicy IfNotPresent).
+svc_version = $(shell sed -n 's/^version = "\(.*\)"$$/\1/p' services/$(1)/pyproject.toml)
+svc_image   = $(IMAGE_PREFIX)$(1):$(or $(IMAGE_TAG),$(call svc_version,$(1)))
+
 .PHONY: build import
-build: ## Build the service images (runtime target)
-	@set -e; for s in $(SERVICES); do \
-	  echo "==> $$s"; \
-	  docker build --target runtime -t $(IMAGE_PREFIX)$$s:$(IMAGE_TAG) services/$$s; \
-	done
+build: ## Build the service images (runtime target), tagged with their version
+	@set -e; $(foreach s,$(SERVICES),echo "==> $(call svc_image,$(s))"; \
+	  docker build --target runtime -t $(call svc_image,$(s)) services/$(s);)
 
 import: build ## Build and import the images into k3d (fast local iteration)
-	k3d image import -c $(CLUSTER_NAME) $(foreach s,$(SERVICES),$(IMAGE_PREFIX)$(s):$(IMAGE_TAG))
+	k3d image import -c $(CLUSTER_NAME) $(foreach s,$(SERVICES),$(call svc_image,$(s)))
 
 # --- Quality -----------------------------------------------------------------
 .PHONY: test lint toolbox smoke

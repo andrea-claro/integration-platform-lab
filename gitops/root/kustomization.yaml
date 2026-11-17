@@ -14,4 +14,10 @@ resources:
   - platform-guardrails.yaml
   - platform-pki.yaml
   - platform-gateway.yaml
-  - apps-echo.yaml          # temporary, removed in Phase 2
+  # Phase 2 - integration workloads
+  - strimzi.yaml
+  - streaming-kafka.yaml
+  - iot-mosquitto.yaml
+  - iot-device-simulator.yaml
+  - iot-mqtt-kafka-bridge.yaml
+  - apps-telemetry-api.yaml

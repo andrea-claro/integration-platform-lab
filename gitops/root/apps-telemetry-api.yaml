@@ -1,0 +1,34 @@
+# Telemetry API with its routes and gateway policies (apps domain). Needs the
+# Gateway API, Envoy Gateway and SealedSecret CRDs from the platform project.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: apps-telemetry-api
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: integration-platform-lab
+  annotations:
+    argocd.argoproj.io/sync-wave: "5"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: apps
+  source:
+    repoURL: https://github.com/andrea-claro/integration-platform-lab.git
+    targetRevision: main
+    path: gitops/apps/telemetry-api
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: apps
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - SkipDryRunOnMissingResource=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m

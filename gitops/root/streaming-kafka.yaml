@@ -1,0 +1,34 @@
+# Kafka cluster and topics (streaming domain). The CRDs come from the strimzi
+# Application, so the first sync may run before they exist.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: streaming-kafka
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: integration-platform-lab
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: streaming
+  source:
+    repoURL: https://github.com/andrea-claro/integration-platform-lab.git
+    targetRevision: main
+    path: gitops/streaming/kafka
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: streaming
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - SkipDryRunOnMissingResource=true
+    retry:
+      limit: 10
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m

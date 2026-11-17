@@ -1,0 +1,79 @@
+# Allow rules for "iot": Mosquitto, device-simulator, mqtt-kafka-bridge.
+# The MQTT broker is cluster-internal: no Service of type LoadBalancer or
+# NodePort, and only the two clients below can reach it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-mosquitto-ingress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mosquitto
+  policyTypes:
+    - Ingress
+  ingress:
+    # Why: the simulator publishes and the bridge subscribes over MQTT.
+    # Authentication and topic ACLs are enforced by Mosquitto itself.
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: device-simulator
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mqtt-kafka-bridge
+      ports:
+        - protocol: TCP
+          port: 1883
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-device-simulator-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: device-simulator
+  policyTypes:
+    - Egress
+  egress:
+    # Why: publish telemetry to the MQTT broker.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mosquitto
+      ports:
+        - protocol: TCP
+          port: 1883
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-mqtt-kafka-bridge-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: mqtt-kafka-bridge
+  policyTypes:
+    - Egress
+  egress:
+    # Why: subscribe to devices/+/telemetry on the MQTT broker.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: mosquitto
+      ports:
+        - protocol: TCP
+          port: 1883
+    # Why: produce to telemetry.raw / telemetry.dlq. Bootstrap and the advertised
+    # broker address both resolve to the Kafka pod on the plain listener.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: streaming
+          podSelector:
+            matchLabels:
+              strimzi.io/cluster: ipl
+              strimzi.io/name: ipl-kafka
+      ports:
+        - protocol: TCP
+          port: 9092

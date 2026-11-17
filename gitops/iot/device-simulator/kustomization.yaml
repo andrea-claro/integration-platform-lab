@@ -1,0 +1,16 @@
+# Simulated sensors publishing JSON telemetry over MQTT (PLAN 2.3).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: iot
+labels:
+  - pairs:
+      app.kubernetes.io/name: device-simulator
+    includeSelectors: true
+  - pairs:
+      app.kubernetes.io/component: iot-device
+      app.kubernetes.io/part-of: integration-platform-lab
+      app.kubernetes.io/version: 0.1.0
+    includeTemplates: true
+resources:
+  - sealedsecret-mqtt.yaml
+  - device-simulator.yaml

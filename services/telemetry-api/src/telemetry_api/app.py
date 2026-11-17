@@ -8,8 +8,9 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Annotated, Protocol
 
-from fastapi import FastAPI, HTTPException, Path, Query, Request, Response
+from fastapi import APIRouter, FastAPI, HTTPException, Path, Query, Request, Response, Security
 from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.security import APIKeyHeader
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
 from pydantic import BaseModel, ConfigDict
 
@@ -26,6 +27,15 @@ HTTP_LATENCY = Histogram(
     buckets=(0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5),
 )
 UNTRACKED_PATHS = {"/metrics", "/healthz", "/readyz"}
+
+# Documentation only: Envoy Gateway validates the key (and strips it) before the
+# request reaches this service. Declaring it makes /docs offer "Authorize".
+API_KEY = APIKeyHeader(
+    name="x-api-key",
+    scheme_name="ApiKey",
+    description="Checked by the gateway (Envoy Gateway SecurityPolicy), not by this service.",
+    auto_error=False,
+)
 
 
 class ConsumerLike(Protocol):
@@ -139,21 +149,22 @@ def create_app(store: TelemetryStore, consumer: ConsumerLike | None = None) -> F
     def metrics() -> Response:
         return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
-    @app.get("/v1/devices", response_model=list[DeviceSummary], tags=["telemetry"])
+    v1 = APIRouter(prefix="/v1", tags=["telemetry"], dependencies=[Security(API_KEY)])
+
+    @v1.get("/devices", response_model=list[DeviceSummary])
     def list_devices() -> list[dict]:
         """All devices seen so far, with the time of their latest reading."""
         return store.devices()
 
-    @app.get("/v1/readings/latest", response_model=list[Reading], tags=["telemetry"])
+    @v1.get("/readings/latest", response_model=list[Reading])
     def latest_readings(limit: Annotated[int, Query(ge=1, le=500)] = 50) -> list[dict]:
         """Latest reading of each device, most recent first."""
         return store.latest_all(limit)
 
-    @app.get(
-        "/v1/devices/{device_id}/latest",
+    @v1.get(
+        "/devices/{device_id}/latest",
         response_model=Reading,
         responses={404: {"description": "Unknown device"}},
-        tags=["telemetry"],
     )
     def device_latest(device_id: DeviceId) -> dict:
         reading = store.latest(device_id)
@@ -161,11 +172,10 @@ def create_app(store: TelemetryStore, consumer: ConsumerLike | None = None) -> F
             raise HTTPException(status_code=404, detail="unknown device")
         return reading
 
-    @app.get(
-        "/v1/devices/{device_id}/stats",
+    @v1.get(
+        "/devices/{device_id}/stats",
         response_model=DeviceStats,
         responses={404: {"description": "Unknown device"}},
-        tags=["telemetry"],
     )
     def device_stats(device_id: DeviceId) -> dict:
         stats = store.stats(device_id)
@@ -173,4 +183,5 @@ def create_app(store: TelemetryStore, consumer: ConsumerLike | None = None) -> F
             raise HTTPException(status_code=404, detail="unknown device")
         return stats
 
+    app.include_router(v1)
     return app

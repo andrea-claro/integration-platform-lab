@@ -39,8 +39,8 @@ done
 # kube-router REJECTs denied traffic, so a blocked connection fails at once with
 # "connection refused" (curl exit 7); a plain DROP would time out (exit 28).
 # A Service without ready endpoints is refused the same way, so check first
-# that echo is actually serving (it also answers through the gateway).
-ready_endpoints="$(k -n apps get endpointslices -l kubernetes.io/service-name=echo \
+# that the API is actually serving (it also answers through the gateway).
+ready_endpoints="$(k -n apps get endpointslices -l kubernetes.io/service-name=telemetry-api \
   -o jsonpath='{range .items[*].endpoints[*]}{.conditions.ready}{"\n"}{end}' 2>/dev/null | grep -c true || true)"
 probe_overrides='{
   "spec": {
@@ -48,7 +48,7 @@ probe_overrides='{
     "containers": [{
       "name": "probe",
       "image": "'"$PROBE_IMAGE"'",
-      "command": ["sh", "-c", "curl -sS -o /dev/null --max-time 5 http://echo.apps.svc.cluster.local/; echo curl_exit=$?"],
+      "command": ["sh", "-c", "curl -sS -o /dev/null --max-time 5 http://telemetry-api.apps.svc.cluster.local/healthz; echo curl_exit=$?"],
       "securityContext": {"allowPrivilegeEscalation": false, "readOnlyRootFilesystem": true, "capabilities": {"drop": ["ALL"]}}
     }]
   }
@@ -63,18 +63,18 @@ code="$(sed -n 's/.*curl_exit=\([0-9]*\).*/\1/p' <<<"$out" | tail -n1)"
 case "$code" in
   7 | 28)
     if ((ready_endpoints > 0)); then
-      pass "pod in iot cannot reach echo.apps ($ready_endpoints ready endpoint(s); connection rejected by NetworkPolicy, curl exit $code)"
+      pass "pod in iot cannot reach telemetry-api.apps ($ready_endpoints ready endpoint(s); connection rejected by NetworkPolicy, curl exit $code)"
     else
-      fail "echo.apps has no ready endpoints: the probe cannot tell a policy block from a missing backend"
+      fail "telemetry-api.apps has no ready endpoints: the probe cannot tell a policy block from a missing backend"
     fi
     ;;
-  0) fail "pod in iot reached echo.apps: the default-deny policy is not enforced" ;;
-  6) fail "probe could not resolve echo.apps.svc (DNS egress blocked?) - inconclusive" ;;
+  0) fail "pod in iot reached telemetry-api.apps: the default-deny policy is not enforced" ;;
+  6) fail "probe could not resolve telemetry-api.apps.svc (DNS egress blocked?) - inconclusive" ;;
   *) fail "network probe inconclusive (curl exit '${code:-none}'): $(tail -n 3 <<<"$out" | tr '\n' ' ')" ;;
 esac
 
 # --- RBAC: workload ServiceAccounts have no API permissions --------------------
-sa="system:serviceaccount:apps:echo"
+sa="system:serviceaccount:apps:telemetry-api"
 for check in "list secrets -n apps" "get pods -n platform" "create deployments -n apps" "get configmaps -n apps"; do
   # shellcheck disable=SC2086 # word splitting of $check is intended
   if [[ "$(k auth can-i --as="$sa" $check 2>/dev/null || true)" == "no" ]]; then

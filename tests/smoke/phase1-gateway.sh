@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
-# Phase 1 acceptance (part 1): the echo service answers over HTTPS through the
-# Gateway, with a certificate issued by the internal CA.
+# Phase 1 acceptance (part 1): a routed service answers over HTTPS through the
+# Gateway, with a certificate issued by the internal CA. Phase 1 used a temporary
+# echo service; since Phase 2 the public docs route of the telemetry API.
 #
 #   tests/smoke/phase1-gateway.sh
 set -euo pipefail
 
 CTX="${KUBE_CONTEXT:-k3d-ipl}"
-HOST="${ECHO_HOST:-echo.ipl.localhost}"
+HOST="${API_HOST:-api.ipl.localhost}"
 PORT="${GATEWAY_PORT:-8443}"
 k() { kubectl --context "$CTX" "$@"; }
 
@@ -53,11 +54,11 @@ k -n platform get secret internal-root-ca -o jsonpath='{.data.ca\.crt}' | base64
 [[ -s "$TMP/ca.crt" ]] || fail "could not read the internal root CA (secret platform/internal-root-ca)"
 
 if ! body="$(curl -sS --fail --max-time 10 --cacert "$TMP/ca.crt" \
-  --resolve "$HOST:$PORT:127.0.0.1" "https://$HOST:$PORT/")"; then
-  fail "HTTPS request to https://$HOST:$PORT failed"
+  --resolve "$HOST:$PORT:127.0.0.1" "https://$HOST:$PORT/openapi.json")"; then
+  fail "HTTPS request to https://$HOST:$PORT/openapi.json failed"
 fi
-if grep -q '^Hostname:' <<<"$body"; then
-  pass "echo answered over HTTPS via the gateway (TLS verified against the internal CA)"
+if grep -q '"openapi"' <<<"$body"; then
+  pass "telemetry-api answered over HTTPS via the gateway (TLS verified against the internal CA)"
 else
   fail "unexpected response: $(head -c 200 <<<"$body")"
 fi

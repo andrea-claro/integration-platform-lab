@@ -1,0 +1,7 @@
+# Topic ACL: one user per client, least privilege (usernames match the password
+# file built by `make seal` and the MQTT_USERNAME of each client's SealedSecret).
+user device-simulator
+topic write devices/+/telemetry
+
+user mqtt-kafka-bridge
+topic read devices/+/telemetry

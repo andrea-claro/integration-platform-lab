@@ -1,0 +1,65 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: device-simulator
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: device-simulator
+spec:
+  replicas: 1
+  # Fixed MQTT client id: two pods would keep disconnecting each other.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {}
+  template:
+    spec:
+      serviceAccountName: device-simulator
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 15
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: device-simulator
+          # Built and published by .github/workflows/images.yaml; `make import`
+          # loads a local build under the same tag (pull only if not present).
+          image: ghcr.io/andrea-claro/ipl-device-simulator:0.1.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - {name: MQTT_HOST, value: mosquitto.iot.svc.cluster.local}
+            - {name: MQTT_PORT, value: "1883"}
+            - {name: MQTT_QOS, value: "1"}
+            - {name: DEVICE_COUNT, value: "10"}
+            - {name: PUBLISH_INTERVAL_SECONDS, value: "5"}
+            - {name: HTTP_PORT, value: "8080"}
+            - {name: LOG_LEVEL, value: INFO}
+          # MQTT_USERNAME / MQTT_PASSWORD
+          envFrom:
+            - secretRef:
+                name: device-simulator-mqtt
+          ports:
+            - name: http      # /healthz, /readyz, /metrics
+              containerPort: 8080
+          readinessProbe:
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          # PLAN §7: our three services ~384 MiB together (idle RSS ~30 MiB).
+          resources:
+            requests: {cpu: 10m, memory: 48Mi}
+            limits: {memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]

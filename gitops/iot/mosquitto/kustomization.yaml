@@ -1,0 +1,22 @@
+# MQTT broker (PLAN 2.2): Eclipse Mosquitto, official image.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: iot
+labels:
+  - pairs:
+      app.kubernetes.io/name: mosquitto
+    includeSelectors: true
+  - pairs:
+      app.kubernetes.io/component: mqtt-broker
+      app.kubernetes.io/part-of: integration-platform-lab
+      app.kubernetes.io/version: 2.1.2
+    includeTemplates: true
+resources:
+  - sealedsecret-passwd.yaml
+  - mosquitto.yaml
+# The name hash rolls the broker when the configuration or the ACL changes.
+configMapGenerator:
+  - name: mosquitto-config
+    files:
+      - mosquitto.conf
+      - acl

@@ -6,7 +6,8 @@ through GitOps: simulated IoT devices publish telemetry over **MQTT**, a bridge 
 Alertmanager and Grafana, with an incident lab for realistic failures.
 
 > Work in progress — see [PLAN.md](PLAN.md) for phases and acceptance criteria.
-> Status: Phase 0 (foundations) and the three services are in place; platform components follow.
+> Status: Phases 0–1 (foundations, gateway, PKI, guardrails) verified; Phase 2 (Kafka, MQTT and the
+> services on the cluster) in review; observability and the incident lab follow.
 >
 > Exposure: only `status.<domain>` and `api.<domain>` are public, through a Cloudflare Tunnel
 > connector running on the host. Argo CD and every other UI are reachable on localhost only.
@@ -37,8 +38,10 @@ make dev-down
 # Cluster (Argo CD syncs from the GitHub repo, so push first)
 make cluster      # k3d cluster "ipl", Traefik disabled, HTTPS on 127.0.0.1:8443
 make bootstrap    # OpenTofu installs Argo CD + the root Application (app-of-apps)
+make import       # optional: run local image builds before CI has published them to GHCR
 make status
-make smoke        # acceptance checks (e.g. HTTPS through the gateway)
+make smoke        # acceptance checks: gateway, guardrails, data flow, 401/429
+# API: https://api.ipl.localhost:8443/docs (internal CA, see gitops/apps/README.md)
 make argocd-password && make argocd-ui    # http://localhost:8080
 ```
 

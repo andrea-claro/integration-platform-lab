@@ -1,0 +1,112 @@
+# Build, test and publish the service images (PLAN 2.7).
+#
+# Pull requests: unit tests and ruff (Dockerfile "test" stage) plus a runtime
+# build for every service; nothing is pushed.
+# Push to main: the same checks, then ghcr.io/<owner>/ipl-<service> is pushed
+# with two tags:
+#   <version>     from services/<service>/pyproject.toml, pinned by gitops/
+#   sha-<commit>  traceability back to the exact commit
+# Version tags are immutable: an existing one is never overwritten, and a pull
+# request that changes an already published service must bump its version
+# (and the tag pinned in gitops/).
+name: images
+
+on:
+  pull_request:
+    paths: ["services/**", ".github/workflows/images.yaml"]
+  push:
+    branches: [main]
+    paths: ["services/**", ".github/workflows/images.yaml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: images-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  image:
+    name: ${{ matrix.service }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write   # GHCR push, used only on main
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [device-simulator, mqtt-kafka-bridge, telemetry-api]
+    env:
+      SERVICE: ${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0              # the version-bump check diffs against the base branch
+          persist-credentials: false
+
+      - name: Resolve image name and version
+        run: |
+          owner="$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
+          version="$(sed -n 's/^version = "\(.*\)"$/\1/p' "services/$SERVICE/pyproject.toml")"
+          if [ -z "$version" ]; then
+            echo "::error::no version in services/$SERVICE/pyproject.toml"
+            exit 1
+          fi
+          {
+            echo "IMAGE=ghcr.io/$owner/ipl-$SERVICE"
+            echo "VERSION=$version"
+            echo "SHA_TAG=sha-${GITHUB_SHA::12}"
+          } >> "$GITHUB_ENV"
+
+      - name: gitops/ pins this version
+        run: |
+          pinned="$(grep -rhoE "ipl-$SERVICE:[^\"' ]+" gitops/ | sort -u)"
+          if [ "$pinned" != "ipl-$SERVICE:$VERSION" ]; then
+            echo "::error::gitops/ pins '${pinned:-nothing}', expected ipl-$SERVICE:$VERSION"
+            exit 1
+          fi
+
+      - name: Log in to GHCR
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: Is this version already published?
+        run: |
+          if docker manifest inspect "$IMAGE:$VERSION" >/dev/null 2>&1; then
+            echo "PUBLISHED=true" >> "$GITHUB_ENV"
+          else
+            echo "PUBLISHED=false" >> "$GITHUB_ENV"
+          fi
+
+      - name: Changed services need a new version
+        if: github.event_name == 'pull_request'
+        run: |
+          if [ "$PUBLISHED" = true ] && ! git diff --quiet "origin/$GITHUB_BASE_REF...HEAD" -- "services/$SERVICE"; then
+            msg="services/$SERVICE changed but $IMAGE:$VERSION is already published."
+            echo "::error::$msg Bump the version in services/$SERVICE/pyproject.toml and the tag in gitops/."
+            exit 1
+          fi
+
+      - name: Unit tests and ruff (test stage)
+        run: docker build --target test --progress=plain "services/$SERVICE"
+
+      - name: Build the runtime image
+        run: |
+          docker build --target runtime \
+            --label "org.opencontainers.image.revision=$GITHUB_SHA" \
+            --label "org.opencontainers.image.version=$VERSION" \
+            -t "$IMAGE:$SHA_TAG" "services/$SERVICE"
+
+      - name: Push to GHCR
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        run: |
+          docker push "$IMAGE:$SHA_TAG"
+          if [ "$PUBLISHED" = true ]; then
+            echo "::notice::$IMAGE:$VERSION already exists and is immutable; pushed $SHA_TAG only"
+          else
+            docker tag "$IMAGE:$SHA_TAG" "$IMAGE:$VERSION"
+            docker push "$IMAGE:$VERSION"
+          fi

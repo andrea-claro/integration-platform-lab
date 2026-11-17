@@ -1,4 +1,4 @@
-# PLAN §7: telemetry-api ~128 MiB (plus the temporary echo service).
+# PLAN §7: telemetry-api ~128 MiB, with headroom for a rolling update.
 apiVersion: v1
 kind: ResourceQuota
 metadata:

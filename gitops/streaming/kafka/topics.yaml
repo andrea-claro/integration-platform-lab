@@ -1,0 +1,26 @@
+# Topics used by the services. Same settings as services/compose.yaml.
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: telemetry-raw
+  labels:
+    strimzi.io/cluster: ipl
+spec:
+  topicName: telemetry.raw
+  partitions: 3
+  replicas: 1
+  config:
+    retention.ms: 3600000      # 1 h: the API keeps the latest state in memory
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: telemetry-dlq
+  labels:
+    strimzi.io/cluster: ipl
+spec:
+  topicName: telemetry.dlq
+  partitions: 1
+  replicas: 1
+  config:
+    retention.ms: 86400000     # 24 h to inspect rejected messages

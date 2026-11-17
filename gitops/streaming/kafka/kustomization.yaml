@@ -1,0 +1,11 @@
+# Kafka cluster "ipl" (KRaft, one dual-role node) and its topics - PLAN 2.1.
+# Reconciled by the Strimzi operator (gitops/root/strimzi.yaml).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: streaming
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: integration-platform-lab
+resources:
+  - kafka.yaml
+  - topics.yaml

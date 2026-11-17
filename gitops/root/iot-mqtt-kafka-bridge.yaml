@@ -1,9 +1,8 @@
-# TEMPORARY (Phase 1 acceptance): echo service behind the gateway.
-# Removed when telemetry-api gets its own route in Phase 2.
+# MQTT -> Kafka bridge (iot domain). Stays unready until both Mosquitto and Kafka answer.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: apps-echo
+  name: iot-mqtt-kafka-bridge
   namespace: argocd
   labels:
     app.kubernetes.io/part-of: integration-platform-lab
@@ -12,20 +11,20 @@ metadata:
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
-  project: apps
+  project: iot
   source:
     repoURL: https://github.com/andrea-claro/integration-platform-lab.git
     targetRevision: main
-    path: gitops/apps/echo
+    path: gitops/iot/mqtt-kafka-bridge
   destination:
     server: https://kubernetes.default.svc
-    namespace: apps
+    namespace: iot
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
-      - SkipDryRunOnMissingResource=true
+      - SkipDryRunOnMissingResource=true   # SealedSecret CRD from the platform project
     retry:
       limit: 10
       backoff:

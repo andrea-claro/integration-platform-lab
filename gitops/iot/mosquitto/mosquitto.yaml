@@ -1,0 +1,118 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mosquitto
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mosquitto-data
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: local-path   # k3s default provisioner
+  resources:
+    requests:
+      storage: 256Mi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mosquitto
+spec:
+  replicas: 1
+  # One pod at a time: the data volume is ReadWriteOnce.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels: {}
+  template:
+    spec:
+      serviceAccountName: mosquitto
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1883      # "mosquitto" in the official image
+        runAsGroup: 1883
+        fsGroup: 1883        # makes the Secret and ConfigMap files group-readable
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        # Mosquitto 2.1 warns (and future versions refuse) when the password or
+        # ACL file is not owned by the broker user. Secret and ConfigMap files
+        # are root-owned, so copy them, as uid 1883 and mode 0400, into an
+        # in-memory volume that the broker mounts read-only.
+        - name: auth-files
+          image: eclipse-mosquitto:2.1.2-alpine
+          command:
+            - sh
+            - -c
+            - install -m 0400 /secret/passwd /mosquitto/auth/passwd && install -m 0400 /config/acl /mosquitto/auth/acl
+          volumeMounts:
+            - {name: passwd, mountPath: /secret, readOnly: true}
+            - {name: config, mountPath: /config, readOnly: true}
+            - {name: auth, mountPath: /mosquitto/auth}
+          resources:
+            requests: {cpu: 5m, memory: 8Mi}
+            limits: {memory: 32Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+      containers:
+        - name: mosquitto
+          image: eclipse-mosquitto:2.1.2-alpine
+          command: ["/usr/sbin/mosquitto", "-c", "/mosquitto/config/mosquitto.conf"]
+          ports:
+            - name: mqtt
+              containerPort: 1883
+          # The broker offers no HTTP health endpoint; an open listener is the signal.
+          readinessProbe:
+            tcpSocket: {port: mqtt}
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket: {port: mqtt}
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          # PLAN §7: cert-manager, sealed-secrets and Mosquitto ~256 MiB together.
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - {name: config, mountPath: /mosquitto/config, readOnly: true}
+            - {name: auth, mountPath: /mosquitto/auth, readOnly: true}
+            - {name: data, mountPath: /mosquitto/data}
+      volumes:
+        - name: passwd
+          secret:
+            secretName: mosquitto-passwd
+            defaultMode: 288   # 0440: owner and group (fsGroup 1883) may read
+        - name: config
+          configMap:
+            name: mosquitto-config
+            defaultMode: 288   # 0440: owner and group (fsGroup 1883) may read
+        - name: auth
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Mi
+        - name: data
+          persistentVolumeClaim:
+            claimName: mosquitto-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mosquitto
+spec:
+  # Cluster-internal only (ClusterIP); clients use mosquitto.iot.svc:1883.
+  selector: {}
+  ports:
+    - name: mqtt
+      port: 1883
+      targetPort: mqtt

@@ -131,14 +131,14 @@ Every task is implemented by an AI coding agent from this plan, reviewed by Andr
 
 ### Phase 2 — Integration workloads (Wed 18 – Thu 19 Nov)
 
-- [ ] 2.1 Strimzi operator; `Kafka` cluster in KRaft mode (1 broker); `KafkaTopic` resources; Kafka Exporter enabled.
-- [ ] 2.2 Mosquitto MQTT broker (official image).
-- [x] 2.3 `device-simulator` (Python): N virtual sensors publishing JSON telemetry to MQTT. *(code, tests, image; k8s manifests pending)*
-- [x] 2.4 `mqtt-kafka-bridge` (Python): MQTT → Kafka topic `telemetry.raw`, with retries and structured logs. *(code, tests, image; k8s manifests pending)*
-- [x] 2.5 `telemetry-api` (FastAPI): consumes Kafka, serves latest readings and per-device stats; OpenAPI docs. *(code, tests, image; k8s manifests pending)*
-- [ ] 2.6 HTTPRoute for the API with local rate limiting and API-key auth (Envoy Gateway policies).
-- [ ] 2.7 Images built and pushed to GHCR by CI; locally `k3d image import` for fast iteration.
-- **Acceptance:** simulator → MQTT → Kafka → API returns fresh readings over HTTPS; no key → 401; burst above the limit → 429; unit tests green.
+- [x] 2.1 Strimzi operator; `Kafka` cluster in KRaft mode (1 broker); `KafkaTopic` resources; Kafka Exporter enabled.
+- [x] 2.2 Mosquitto MQTT broker (official image).
+- [x] 2.3 `device-simulator` (Python): N virtual sensors publishing JSON telemetry to MQTT.
+- [x] 2.4 `mqtt-kafka-bridge` (Python): MQTT → Kafka topic `telemetry.raw`, with retries and structured logs.
+- [x] 2.5 `telemetry-api` (FastAPI): consumes Kafka, serves latest readings and per-device stats; OpenAPI docs.
+- [x] 2.6 HTTPRoute for the API with local rate limiting and API-key auth (Envoy Gateway policies).
+- [x] 2.7 Images built and pushed to GHCR by CI; locally `k3d image import` for fast iteration. *(first publish when the workflow runs on `main`)*
+- **Acceptance:** simulator → MQTT → Kafka → API returns fresh readings over HTTPS; no key → 401; burst above the limit → 429; unit tests green. *(scripted in `tests/smoke/phase2-integration.sh`; to be confirmed on the Mac)*
 
 ### Phase 3 — Observability (Fri 20 Nov)
 

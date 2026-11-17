@@ -1,0 +1,66 @@
+# Gateway policies for the telemetry API (Envoy Gateway v1.9).
+# API: https://gateway.envoyproxy.io/v1.9/api/extension_types/
+#
+# Filter order in the Envoy proxy (v1.9.3, internal/xds/translator/httpfilters.go):
+# API key auth runs before the local rate limit, so the rate limit can tell
+# clients apart by the client id header that the auth filter sets.
+#
+# API key authentication on /v1. Keys live in the SealedSecret
+# "telemetry-api-keys": one entry per client id (demo, admin), the value is the
+# key (`make seal`). Missing or wrong key -> 401 from the gateway; the service
+# never sees the request.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata:
+  name: telemetry-api-key
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: telemetry-api
+  apiKeyAuth:
+    credentialRefs:
+      - group: ""
+        kind: Secret
+        name: telemetry-api-keys
+    extractFrom:
+      - headers: ["x-api-key"]
+    # The key is removed before the request is forwarded...
+    sanitize: true
+    # ...and replaced by the client id. Envoy overwrites this header, so a
+    # client cannot claim another identity by sending it.
+    forwardClientIDHeader: x-client-id
+---
+# Local rate limits, enforced by the Envoy proxy itself (no Redis). Buckets are
+# per route and per proxy replica (one replica here). When several rules match,
+# the strictest wins (HTTP 429).
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: telemetry-api-rate-limit
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: telemetry-api
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: telemetry-api-docs
+  rateLimit:
+    local:
+      rules:
+        # The demo key is published with the docs: keep it tight. Every demo
+        # visitor shares this bucket.
+        - clientSelectors:
+            - headers:
+                - name: x-client-id
+                  type: Exact
+                  value: demo
+          limit:
+            requests: 20
+            unit: Minute
+        # Ceiling for everything else on each route (admin key, docs pages),
+        # sized for a laptop.
+        - limit:
+            requests: 300
+            unit: Minute
