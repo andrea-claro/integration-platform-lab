@@ -40,7 +40,7 @@ The full plan, phases and acceptance criteria are in **PLAN.md**. Work only on t
 - **Networking:** Gateway API + Envoy Gateway, cert-manager (internal CA), NetworkPolicies, CoreDNS.
 - **Integration:** Strimzi Kafka (KRaft, 1 broker), Eclipse Mosquitto.
 - **Our services (Python 3.12):** `device-simulator`, `mqtt-kafka-bridge`, `telemetry-api` (FastAPI). Images on GHCR.
-- **Observability:** kube-prometheus-stack, Alertmanager → Telegram.
+- **Observability:** kube-prometheus-stack (Prometheus, Alertmanager UI, Grafana), promtool-tested rules.
 - **Secrets:** Sealed Secrets. **Exposure:** existing Cloudflare Tunnel connector on the Mac → Envoy Gateway; admin UIs local only.
 - **Quality:** ruff, pytest, yamllint, kubeconform, kube-linter, Trivy config, promtool.
 
@@ -65,10 +65,12 @@ Created in Phase 0; keep this list up to date.
 - `make bootstrap` — install Argo CD and the root Application (OpenTofu; `TF=terraform` to switch)
 - `make status` — Argo CD apps, pods not ready, firing alerts
 - `make argocd-password` / `make argocd-ui` — admin password, UI on http://localhost:8080
+- `make grafana-ui` / `make prometheus-ui` / `make alertmanager-ui` — observability UIs on localhost (3000, 9090, 9093)
 - `make seal` — seal secrets from `.env` into SealedSecret manifests; `make check-secrets` — plain-secret scan
 - `make seal-backup` — back up the Sealed Secrets key to `secrets/` (gitignored); `make bootstrap` restores it
 - `make smoke` — acceptance checks against the running cluster (`tests/smoke/*.sh`)
 - `make test` — ruff + pytest per service in the image `test` stage; `make lint` — repo checks in the toolbox image
+- `make test-rules` — promtool unit tests for every alert and the runbook check (also part of `make lint`)
 - `make build` / `make import` — build service images, import them into k3d
 - `make dev-up` / `make dev-smoke` / `make dev-down` — services with Docker Compose (local dev only, not a deployment path)
 - `make break-<scenario>` / `make restore-<scenario>` — incident lab (Phase 4)

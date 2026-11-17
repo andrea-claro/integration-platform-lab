@@ -60,14 +60,6 @@ seal() {
 
 skip() { echo "skipped $1: $2 not set in .env"; }
 
-seal_telegram() {
-  is_set TELEGRAM_BOT_TOKEN || { skip alertmanager-telegram TELEGRAM_BOT_TOKEN; return; }
-  is_set TELEGRAM_CHAT_ID || { skip alertmanager-telegram TELEGRAM_CHAT_ID; return; }
-  seal alertmanager-telegram observability gitops/observability/secrets/sealedsecret-alertmanager-telegram.yaml \
-    --from-literal=bot_token="$TELEGRAM_BOT_TOKEN" \
-    --from-literal=chat_id="$TELEGRAM_CHAT_ID"
-}
-
 seal_grafana() {
   is_set GRAFANA_ADMIN_PASSWORD || { skip grafana-admin GRAFANA_ADMIN_PASSWORD; return; }
   seal grafana-admin observability gitops/observability/secrets/sealedsecret-grafana-admin.yaml \
@@ -107,7 +99,7 @@ seal_mqtt() {
     --from-literal=MQTT_PASSWORD="$MQTT_BRIDGE_PASSWORD"
 }
 
-ALL=(telegram grafana api_keys mqtt)
+ALL=(grafana api_keys mqtt)
 targets=("$@")
 ((${#targets[@]})) || targets=("${ALL[@]}")
 
