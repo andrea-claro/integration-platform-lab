@@ -6,7 +6,7 @@ CTX="${KUBE_CONTEXT:-k3d-ipl}"
 k() { kubectl --context "$CTX" "$@"; }
 
 if ! k version --request-timeout=5s >/dev/null 2>&1; then
-  echo "cluster $CTX not reachable (run 'make cluster')"
+  echo "cluster $CTX not reachable: 'k3d cluster start ipl' if it was stopped, 'make cluster' if it does not exist"
   exit 1
 fi
 

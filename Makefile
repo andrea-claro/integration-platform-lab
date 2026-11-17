@@ -85,13 +85,20 @@ check-secrets: ## Fail on plain Secret manifests or tracked .env files
 svc_version = $(shell sed -n 's/^version = "\(.*\)"$$/\1/p' services/$(1)/pyproject.toml)
 svc_image   = $(IMAGE_PREFIX)$(1):$(or $(IMAGE_TAG),$(call svc_version,$(1)))
 
-.PHONY: build import
+.PHONY: build import cluster-running
 build: ## Build the service images (runtime target), tagged with their version
 	@set -e; $(foreach s,$(SERVICES),echo "==> $(call svc_image,$(s))"; \
 	  docker build --target runtime -t $(call svc_image,$(s)) services/$(s);)
 
-import: build ## Build and import the images into k3d (fast local iteration)
+import: cluster-running build ## Build and import the images into k3d (fast local iteration)
 	k3d image import -c $(CLUSTER_NAME) $(foreach s,$(SERVICES),$(call svc_image,$(s)))
+
+# k3d reports "Successfully imported" even when the node container is stopped.
+cluster-running:
+	@running="$$(k3d cluster list $(CLUSTER_NAME) -o json 2>/dev/null | jq -r '.[0].serversRunning // 0')"; \
+	if [ "$${running:-0}" -lt 1 ]; then \
+	  echo "cluster $(CLUSTER_NAME) is not running: k3d cluster start $(CLUSTER_NAME) (or make cluster)"; exit 1; \
+	fi
 
 # --- Quality -----------------------------------------------------------------
 .PHONY: test lint toolbox smoke
