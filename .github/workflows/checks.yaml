@@ -1,0 +1,35 @@
+# Repository checks on every pull request and on main (PLAN 5.1): the same
+# scripts/lint.sh as `make lint`, in the same pinned toolbox image.
+#   secret scan, yamllint, shellcheck, ruff, kustomize build + kubeconform
+#   (with CRD schemas), promtool rule tests + runbook check, tofu fmt + validate.
+# Unit tests and image builds run in images.yaml.
+name: checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lint:
+    name: make lint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Build the pinned toolbox image
+        run: docker build -q -t ipl-toolbox:local tools
+
+      - name: Repository checks
+        run: docker run --rm -u "$(id -u):$(id -g)" -v "$PWD:/work" ipl-toolbox:local scripts/lint.sh

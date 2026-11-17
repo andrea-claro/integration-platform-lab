@@ -5,6 +5,41 @@ time, following [CLAUDE.md](../CLAUDE.md); Andrea reviews every change before it
 Each session is logged below: task, what the agent produced, what was verified, what is open,
 and a human review section.
 
+## Workflow
+
+1. The agent restates the task and its acceptance criteria from PLAN.md and proposes a short plan.
+   Anything touching architecture, RBAC, NetworkPolicies, secrets or exposure waits for approval.
+2. It implements in small commits on a branch, tests or validation first where possible.
+3. Before opening the pull request it runs, in its sandbox: unit tests, `scripts/lint.sh`
+   (yamllint, shellcheck, ruff, kubeconform with CRD schemas, promtool, tofu validate, secret scan),
+   and a server-side dry-run of every manifest against a real k3s API server with the CRDs of the
+   pinned charts (Pod Security, quotas and LimitRanges included).
+4. Andrea reviews and merges; Argo CD deploys; `make smoke` verifies the phase on the real cluster.
+   What the sandbox cannot see (pods running, NetworkPolicy enforcement) is found there.
+
+## Review checklist
+
+- Does it meet the acceptance criteria, and is there a test or smoke check that proves it?
+- NetworkPolicies: least privilege, a "why" on every rule, no namespace-wide shortcuts.
+- RBAC and AppProjects: no new cluster-scoped kinds without a reason; workloads without API rights.
+- Secrets: only SealedSecrets; nothing sensitive in logs, manifests or the public repo.
+- Resources within PLAN §7; versions pinned; docs of the pinned version actually checked.
+- Exposure: nothing new reachable from outside except the explicitly routed hostnames.
+
+## Corrected or rejected along the way (highlights)
+
+| Found by | Problem | Change |
+|---|---|---|
+| agent's own outage test | the bridge acknowledged MQTT before Kafka confirmed: messages could be lost | ack only after delivery |
+| first run on the Mac | services crash-looped: files reached the Mac with mode 600, runtime user could not read them | `chmod` in the image + a build step importing the app as the runtime user |
+| human verification | `.gitignore` rule `secrets/` silently ignored `gitops/observability/secrets/` | anchored to `/secrets/` |
+| first smoke run | network probe expected a timeout, kube-router rejects instead | test accepts both, after checking the backend is ready |
+| Phase 2 on the Mac | Kafka crash loop: default deny blocked its startup call to the Kubernetes API | explicit egress rule; became the example in a runbook |
+| Phase 2 on the Mac | `k3d image import` reported success with the cluster stopped | `make import` checks the cluster first |
+| interrupted session | Phase 2 work lost because nothing had been pushed | replayed from the transcript; push after every commit |
+| agent's own checks | promtool tests that might not bite | mutation check: weakening a rule must fail its test |
+| scope review (human) | a lab for reviewers does not need every feature | lean scope for Phases 3–5 (PLAN §6) |
+
 ---
 
 ## 2026-11-15 — Phase 0 foundations + Python services
@@ -331,6 +366,25 @@ first run on the Mac, with real timings).
 
 **Verified (agent sandbox):** shellcheck (now also on `incidents/`), lint green. Running the
 scenario needs the cluster: next step on the Mac.
+
+**Human review:** _to be filled in by Andrea_
+
+---
+
+## 2026-11-17 — Phase 5 (lean): CI checks, README, ADRs
+
+**Tasks:** 5.1–5.4.
+
+**Produced**
+
+- `.github/workflows/checks.yaml`: `scripts/lint.sh` in the pinned toolbox image on every pull
+  request and on `main` (unit tests and image builds stay in `images.yaml`).
+- README rewritten for a reviewer: two-minute tour, architecture diagram (Mermaid), local → AWS
+  table, quickstart, incident lab, security and reliability choices, next steps.
+- ADR-001 to ADR-004 and ADR-006 (ADR-005 existed), each with alternatives and the AWS mapping.
+- This file: workflow, review checklist and the highlights of what was corrected along the way.
+
+**Verified (agent sandbox):** lint green; Mermaid diagram validated.
 
 **Human review:** _to be filled in by Andrea_
 

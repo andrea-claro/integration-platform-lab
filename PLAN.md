@@ -160,10 +160,10 @@ Every task is implemented by an AI coding agent from this plan, reviewed by Andr
 
 ### Phase 5 — CI, docs, polish (Sun 22 – Mon 23 Nov)
 
-- [ ] 5.1 GitHub Actions: yamllint, kubeconform on rendered manifests, `promtool test rules`, ruff + pytest, `tofu fmt` + `validate`, image build → GHCR. *(kube-linter, Trivy cut, see §6)*
-- [ ] 5.2 README: what it is, architecture diagram, local ↔ AWS table, quickstart, incident lab walkthrough, live links.
-- [ ] 5.3 `docs/how-this-was-built.md`: agent workflow, review checklist, examples of AI output corrected or rejected.
-- [ ] 5.4 ADR-001 to ADR-006.
+- [x] 5.1 GitHub Actions: yamllint, kubeconform on rendered manifests, `promtool test rules`, ruff + pytest, `tofu fmt` + `validate`, image build → GHCR. *(kube-linter, Trivy cut, see §6)*
+- [x] 5.2 README: what it is, architecture diagram, local ↔ AWS table, quickstart, incident lab walkthrough, live links. *(live links added with the public exposure)*
+- [x] 5.3 `docs/how-this-was-built.md`: agent workflow, review checklist, examples of AI output corrected or rejected.
+- [x] 5.4 ADR-001 to ADR-006.
 - **Acceptance:** CI green on `main`; a reviewer understands the platform and the incident lab in two minutes.
 
 ### Phase 6 — Next steps (not scheduled: listed in the README)
