@@ -21,3 +21,6 @@ resources:
   - iot-device-simulator.yaml
   - iot-mqtt-kafka-bridge.yaml
   - apps-telemetry-api.yaml
+  # Phase 3 - observability
+  - kube-prometheus-stack.yaml
+  - observability-config.yaml

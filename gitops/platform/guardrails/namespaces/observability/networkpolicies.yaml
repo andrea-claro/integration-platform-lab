@@ -1,0 +1,129 @@
+# Allow rules for "observability" (kube-prometheus-stack, PLAN 3). Pod labels as
+# set by the chart 93.3.1 and Prometheus Operator v0.95. Scrapes *into* every
+# domain namespace are admitted there by the base rule allow-prometheus-scrape.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-kube-api-egress
+spec:
+  # Why: the operator manages the Prometheus and Alertmanager StatefulSets and
+  # their config; Prometheus discovers scrape targets (pods, endpoints);
+  # kube-state-metrics lists pods and deployments; Grafana's sidecars load the
+  # dashboard and datasource ConfigMaps. Alertmanager needs none of it.
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values: [prometheus, kube-prometheus-stack-prometheus-operator, kube-state-metrics, grafana]
+  policyTypes:
+    - Egress
+  egress:
+    # k3s DNATs kubernetes.default (10.43.0.1:443) to the node IP on 6443
+    # (see namespaces/platform).
+    - to:
+        - ipBlock:
+            cidr: 172.16.0.0/12
+        - ipBlock:
+            cidr: 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 6443
+    - to:
+        - ipBlock:
+            cidr: 10.43.0.1/32
+      ports:
+        - protocol: TCP
+          port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-egress
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  policyTypes:
+    - Egress
+  egress:
+    # Why: scrape the metrics endpoints listed in gitops/observability/monitors.yaml,
+    # on their metrics ports only: our services (8080), Kafka Exporter (9404),
+    # cert-manager (9402).
+    - to:
+        - namespaceSelector:
+            matchExpressions:
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values: [iot, apps, streaming, platform]
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 9404
+        - protocol: TCP
+          port: 9402
+    # Why: scrape the stack itself (Grafana 3000; kube-state-metrics, operator and
+    # config reloaders 8080; Prometheus 9090) and send alerts to Alertmanager (9093).
+    - to:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 3000
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 9090
+        - protocol: TCP
+          port: 9093
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-grafana-datasources
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: grafana
+  policyTypes:
+    - Egress
+  egress:
+    # Why: Grafana queries its two datasources, Prometheus and Alertmanager.
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 9090
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: alertmanager
+      ports:
+        - protocol: TCP
+          port: 9093
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-queries-from-grafana
+spec:
+  # Why: the matching ingress for Grafana's datasource queries. Prometheus's own
+  # traffic (scrapes, alerts to Alertmanager) is admitted by allow-prometheus-scrape.
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values: [prometheus, alertmanager]
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: grafana
+      ports:
+        - protocol: TCP
+          port: 9090
+        - protocol: TCP
+          port: 9093

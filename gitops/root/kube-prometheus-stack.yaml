@@ -1,0 +1,130 @@
+# kube-prometheus-stack 93.3.1 (Prometheus Operator v0.95.2, Grafana 13.3) - PLAN 3.1.
+# Installed by the platform project because the chart ships CRDs and cluster RBAC;
+# everything runs in "observability". Lean on purpose (PLAN §6, scope update):
+# no node-exporter, no scraping of k3s control-plane components, none of the
+# chart's default rules or dashboards. Scrape targets, alert rules and the
+# dashboard come from gitops/observability (Application observability-config).
+# Values: https://github.com/prometheus-community/helm-charts/blob/kube-prometheus-stack-93.3.1/charts/kube-prometheus-stack/values.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+  labels:
+    app.kubernetes.io/part-of: integration-platform-lab
+  annotations:
+    argocd.argoproj.io/sync-wave: "-5"
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 93.3.1
+    helm:
+      releaseName: kps
+      valuesObject:
+        fullnameOverride: kps          # short names: kps-prometheus, kps-grafana, ...
+        crds:
+          enabled: true
+        defaultRules:
+          create: false                # our own rules only (gitops/observability/rules)
+        kubernetesServiceMonitors:
+          enabled: false               # API server, kubelet, CoreDNS, etcd...: not needed here
+        nodeExporter:
+          enabled: false               # k3d "nodes" are containers; keeps the namespace at baseline PSS
+        windowsMonitoring:
+          enabled: false
+        kube-state-metrics:
+          collectors: [pods, deployments]    # restarts, readiness, availability
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {memory: 128Mi}
+        prometheusOperator:
+          admissionWebhooks:
+            enabled: false             # rules are validated by promtool tests instead
+          tls:
+            enabled: false
+          resources:
+            requests: {cpu: 10m, memory: 48Mi}
+            limits: {memory: 128Mi}
+          # Sidecar in the Prometheus and Alertmanager pods (reloads config).
+          prometheusConfigReloader:
+            resources:
+              requests: {cpu: 5m, memory: 24Mi}
+              limits: {memory: 64Mi}
+        prometheus:
+          prometheusSpec:
+            retention: 2d
+            scrapeInterval: 30s
+            evaluationInterval: 30s
+            # PLAN §7: Prometheus ~1 GiB; a few thousand series need far less.
+            resources:
+              requests: {cpu: 50m, memory: 256Mi}
+              limits: {memory: 768Mi}
+            # Select every monitor and rule, but only from "observability": the
+            # domain projects cannot add scrape targets or alerts on their own.
+            serviceMonitorSelectorNilUsesHelmValues: false
+            podMonitorSelectorNilUsesHelmValues: false
+            ruleSelectorNilUsesHelmValues: false
+            probeSelectorNilUsesHelmValues: false
+            scrapeConfigSelectorNilUsesHelmValues: false
+            serviceMonitorNamespaceSelector:
+              matchLabels: {kubernetes.io/metadata.name: observability}
+            podMonitorNamespaceSelector:
+              matchLabels: {kubernetes.io/metadata.name: observability}
+            ruleNamespaceSelector:
+              matchLabels: {kubernetes.io/metadata.name: observability}
+        alertmanager:
+          # No external receiver (Telegram cut, PLAN §6): alerts are read in the
+          # Alertmanager UI (make alertmanager-ui) and in Grafana.
+          alertmanagerSpec:
+            replicas: 1
+            retention: 24h
+            resources:
+              requests: {cpu: 10m, memory: 32Mi}
+              limits: {memory: 128Mi}
+        grafana:
+          defaultDashboardsEnabled: false
+          testFramework:
+            enabled: false
+          admin:
+            existingSecret: grafana-admin  # SealedSecret in gitops/observability
+            userKey: admin-user
+            passwordKey: admin-password
+          sidecar:
+            dashboards:
+              searchNamespace: observability
+            # Two sidecars (dashboards, datasources) watch ConfigMaps.
+            resources:
+              requests: {cpu: 5m, memory: 48Mi}
+              limits: {memory: 128Mi}
+          grafana.ini:
+            analytics:
+              reporting_enabled: false
+              check_for_updates: false
+              check_for_plugin_updates: false
+            news:
+              news_feed_enabled: false
+            users:
+              allow_sign_up: false
+          # PLAN §7: Grafana + Alertmanager ~384 MiB.
+          resources:
+            requests: {cpu: 20m, memory: 128Mi}
+            limits: {memory: 256Mi}
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: observability
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - ServerSideApply=true   # the monitoring.coreos.com CRDs exceed the client-side limit
+    retry:
+      limit: 10
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 5m

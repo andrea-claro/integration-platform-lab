@@ -26,6 +26,7 @@ spec:
     - https://bitnami.github.io/sealed-secrets
     - oci://registry-1.docker.io/envoyproxy/*
     - oci://quay.io/strimzi-helm/*
+    - https://prometheus-community.github.io/helm-charts
   destinations:
     - server: https://kubernetes.default.svc
       namespace: platform
@@ -39,7 +40,8 @@ spec:
     - server: https://kubernetes.default.svc
       namespace: observability
   # Cluster-scoped kinds actually rendered by our manifests and the pinned charts
-  # (cert-manager, Envoy Gateway, Sealed Secrets, Strimzi). Anything else is refused.
+  # (cert-manager, Envoy Gateway, Sealed Secrets, Strimzi, kube-prometheus-stack).
+  # Anything else is refused.
   clusterResourceWhitelist:
     - group: ""
       kind: Namespace
