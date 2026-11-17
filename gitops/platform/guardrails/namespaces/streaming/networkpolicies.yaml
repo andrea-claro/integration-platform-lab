@@ -80,6 +80,25 @@ spec:
           port: 9090
         - protocol: TCP
           port: 9091
+    # Why: at startup the node reads its own configuration Secret
+    # (ipl-dual-role-0, listener certificates and keys) through the Kubernetes
+    # API, using Strimzi's KubernetesSecretConfigProvider. Without this rule the
+    # storage format step fails ("Failed to retrieve Secret") and the pod
+    # crash-loops. Same k3s DNAT of kubernetes.default as in namespaces/platform.
+    - to:
+        - ipBlock:
+            cidr: 172.16.0.0/12
+        - ipBlock:
+            cidr: 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 6443
+    - to:
+        - ipBlock:
+            cidr: 10.43.0.1/32
+      ports:
+        - protocol: TCP
+          port: 443
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
