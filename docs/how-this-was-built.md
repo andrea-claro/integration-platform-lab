@@ -303,3 +303,35 @@ Not verifiable in the sandbox: scraping through the NetworkPolicies, Grafana loa
 **Human review:** _to be filled in by Andrea_
 
 ---
+
+## 2026-11-17 — Phase 4 (lean), part 1: incident lab, scenario `dns`
+
+**Tasks:** 4.1 incident framework · 4.2 scenario `dns` · 4.3 runbook (the postmortem follows the
+first run on the Mac, with real timings).
+
+**Produced**
+
+- `make incidents`, `make break-<name>`, `make restore-<name>`; `incidents/lib.sh` pauses and resumes
+  Argo CD self-heal (on the application and on `root`, which would otherwise restore the
+  application's sync policy from Git) and queries Prometheus through the API server proxy.
+- `incidents/dns`: the bridge's Kafka bootstrap address is changed live to a name in a namespace
+  that does not exist. `restore.sh` resumes self-heal, waits for Argo CD to put the Git value back
+  and the MQTT queue to drain, then prints a timeline (injected, alert fired, restore, recovered)
+  and compares messages published during the outage with messages delivered to Kafka.
+- `docs/runbooks/incident-dns.md`: symptom → evidence on the dashboard and in the logs → layer by
+  layer checks (DNS, network, Kafka) → what changed (live vs Git, managed fields) → fix through
+  GitOps → verification.
+
+**Design notes**
+
+- Self-heal must be paused on `root` too: root manages the child Application objects and would
+  revert the child's `selfHeal: false` within a minute.
+- The alert that fires is the symptom (`TelemetryPipelineStalled`), not the cause; the runbook shows
+  how readiness (`mqtt_connected` / `kafka_up`) and the dashboard narrow it down.
+
+**Verified (agent sandbox):** shellcheck (now also on `incidents/`), lint green. Running the
+scenario needs the cluster: next step on the Mac.
+
+**Human review:** _to be filled in by Andrea_
+
+---

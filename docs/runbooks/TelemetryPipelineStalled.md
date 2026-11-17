@@ -25,7 +25,7 @@ still flowing and produced at zero → the bridge cannot reach Kafka. Both at ze
 
 | What you see | Likely cause | Next step |
 |---|---|---|
-| `kafka_up: false`, logs `Failed to resolve` / `Name or service not known` | wrong `KAFKA_BOOTSTRAP_SERVERS` (incident lab scenario `dns`) | `kubectl -n iot get deploy mqtt-kafka-bridge -o yaml \| grep -A1 KAFKA_BOOTSTRAP`, compare with Git |
+| `kafka_up: false`, logs `Failed to resolve` / `Name or service not known` | wrong `KAFKA_BOOTSTRAP_SERVERS` | walkthrough: [incident-dns.md](incident-dns.md) |
 | `kafka_up: false`, connection refused / timeouts | Kafka down or a NetworkPolicy change | `kubectl -n streaming describe pod ipl-dual-role-0`, [PodCrashLooping](PodCrashLooping.md) |
 | `mqtt_connected: false`, `not authorised` | MQTT credentials out of sync with the broker's password file | `make seal`, commit the SealedSecrets |
 | bridge pod missing or not ready | rollout or crash | [PodCrashLooping](PodCrashLooping.md), [TargetDown](TargetDown.md) |

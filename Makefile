@@ -21,7 +21,7 @@ LOAD_ENV := set -a; [ -f .env ] && . ./.env; set +a
 
 .PHONY: help
 help: ## List targets
-	@awk 'BEGIN{FS=":.*## "} /^[a-zA-Z0-9_-]+:.*## /{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+	@awk 'BEGIN{FS=":.*## "} /^[a-zA-Z0-9_%-]+:.*## /{printf "  \033[36m%-16s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
 
 # --- Setup ------------------------------------------------------------------
 .PHONY: env prereqs
@@ -135,6 +135,19 @@ else
 lint:
 	scripts/lint.sh
 endif
+
+# --- Incident lab (PLAN 4): live faults, recovery through Argo CD -------------
+.PHONY: incidents
+incidents: ## List the incident scenarios (make break-<name> / make restore-<name>)
+	@for d in incidents/*/; do n=$$(basename $$d); printf "  %-8s %s\n" $$n "$$(sed -n 's/^# Incident "[a-z]*": //p' $$d/inject.sh | head -1)"; done
+
+break-%: ## Inject an incident scenario (e.g. make break-dns), then follow its runbook
+	@test -x incidents/$*/inject.sh || { echo "unknown scenario '$*' (make incidents)"; exit 1; }
+	@KUBE_CONTEXT=$(KUBE_CONTEXT) incidents/$*/inject.sh
+
+restore-%: ## Restore a scenario through GitOps and print a timeline (e.g. make restore-dns)
+	@test -x incidents/$*/restore.sh || { echo "unknown scenario '$*' (make incidents)"; exit 1; }
+	@KUBE_CONTEXT=$(KUBE_CONTEXT) incidents/$*/restore.sh
 
 # --- Local dev stack for the services (Docker Compose, not a deployment path) --
 .PHONY: dev-up dev-down dev-logs dev-smoke
