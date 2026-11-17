@@ -3,8 +3,7 @@
 # Resource budget (PLAN.md §7): ~512 MiB of memory requests in total.
 
 global:
-  # Local hostname for now; becomes argocd.<domain> only if it is ever published
-  # (and then only behind Cloudflare Access).
+  # Local only: the UI is reached through `make argocd-ui` (port-forward).
   domain: argocd.localhost
   logging:
     format: json

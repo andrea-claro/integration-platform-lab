@@ -15,7 +15,7 @@ kubeAPI:
   hostPort: "6445"
 ports:
   # HTTPS into Envoy Gateway (Service type LoadBalancer, served by k3s servicelb).
-  # Bound to loopback only: the public surface goes exclusively through cloudflared.
+  # Bound to loopback only: nothing is reachable from other machines.
   - port: 127.0.0.1:8443:443
     nodeFilters:
       - loadbalancer

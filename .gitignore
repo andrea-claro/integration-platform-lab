@@ -19,9 +19,6 @@ sealed-secrets-key*.yaml
 *.pem
 *.p12
 *.pfx
-# cloudflared local credentials (we use a token from .env instead)
-.cloudflared/
-cloudflared-credentials*.json
 # kubeconfigs
 kubeconfig
 *.kubeconfig

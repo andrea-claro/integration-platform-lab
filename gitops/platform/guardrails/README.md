@@ -14,7 +14,7 @@ node itself (kubelet probes, API server → admission webhooks) is always accept
 | every pod | CoreDNS (`kube-system`) | 53 UDP/TCP | name resolution |
 | Prometheus (`observability`) | every pod | any | metrics scraping (Phase 3) |
 | controllers in `platform` | Kubernetes API (node IP) | 6443 | watch and update resources |
-| anyone | Envoy proxies (`platform`) | 10443 | HTTPS listener; outside the cluster only via `127.0.0.1:8443` and the tunnel |
+| anyone | Envoy proxies (`platform`) | 10443 | HTTPS listener; outside the cluster only via `127.0.0.1:8443` |
 | Envoy proxies | namespaces with `gateway-access=true` (`apps`, `observability`) | any | route traffic to backends |
 | Envoy proxies | Envoy Gateway controller | 18000 | xDS configuration |
 | Envoy proxies (`platform`) | every pod in `apps` | 8080 | routed requests |
