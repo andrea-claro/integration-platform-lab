@@ -21,6 +21,10 @@ to `127.0.0.1` only.
 - Built-in service load balancer (servicelb) and local-path storage: the Envoy Gateway Service
   and the Kafka and Mosquitto volumes work without add-ons.
 - One node: no scheduling, spreading or node-failure scenarios. Fine for this lab.
+- **Datastore: embedded etcd (`--cluster-init`), not the default SQLite.** With the full stack
+  (a dozen controllers renewing leases, Argo CD reconciling large CRDs), k3s on SQLite timed out
+  and exited on the laptop ([postmortem](../postmortems/2026-11-17-k3s-control-plane-crash.md)).
+  metrics-server is disabled: unused, and its aggregated API delayed readiness after a restart.
 - k3s specifics to know: `kubernetes.default` is DNATed to the node IP on 6443 (NetworkPolicies
   allow that address), and kube-router rejects denied traffic instead of dropping it.
 
